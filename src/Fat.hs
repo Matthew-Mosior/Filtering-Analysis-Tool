@@ -278,7 +278,7 @@ compilerOpts argv =
                do SIO.hPutStrLn stderr (outsheetnamemm ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isOutputSheetName) args) > 0) &&
-                 (not (Main.isAlphaList (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
+                 (not (checkOutputSheetName (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
                do SIO.hPutStrLn stderr (outsheeterror ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isBinaryPassingColor) args) > 0) &&
@@ -316,8 +316,8 @@ compilerOpts argv =
             outfilenamemiss  = "Output file name missing.\nPlease provide an output file name.\n"
             outsheetnamemm   = "Xlsx sheet name not applicable for tsv output file.\n\
                                \If outputting tsv, do not provide out -s (--outputsheetname) argument.\n"
-            outsheeterror    = "Please provide only alphabetic characters (a-z,A-Z)\n\
-                               \to -s (--outputsheetname) argument.\n"
+            outsheeterror    = "Please provide xlsx accepted characters for sheet names (\\/*?:[].)\n\
+                               \less than 31 characters long to the -s (--outputsheetname) argument.\n"
             hexferror        = "Incorrect hex format.\n"
             hexf             = "ASCII hexadecimal digits: '0'..'9', 'a'..'f', 'A'..'F'.\n"
             sufferror        = "File extension not allowed.\n"
@@ -459,6 +459,18 @@ checkOutputFileTypeAndOutputFileNameFormat xs ys = if (xs == "tsv" && (ys =~ ("\
                                                       (xs == "xlsx" && (ys =~ ("\\.xlsx$" :: String) :: Bool))
                                                        then True
                                                        else False
+
+{---------------------------}
+
+
+{-OutputSheetName function.-}
+
+checkOutputSheetName :: String -> Bool
+checkOutputSheetName [] = False
+checkOutputSheetName xs = if DL.length xs <= 31 &&
+                             DL.all (\x -> x `DL.notElem` "\\/*?:[].") xs
+                              then True
+                              else False
 
 {---------------------------}
 

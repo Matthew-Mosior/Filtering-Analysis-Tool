@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 1.0=-}
+{-=Version: 2.0=-}
 {-=Synopsis:  This Haskell Script will take in=-} 
 {-=a tab-delimited file and provide a in-depth view=-} 
 {-=of the user-defined filtering schema provided.=-}
@@ -16,6 +16,7 @@
 
 {-Import module.-}
 
+import SpecificFilters
 import FatDefinitions
 
 {----------------}
@@ -53,16 +54,19 @@ import Text.Regex.TDFA as TRP
 {-Custom CML Option Datatype.-}
 
 data Flag 
-    = Verbose                -- -v
-    | Version                -- -V -?
-    | OutputFileType  String -- -t
-    | OutputFileName  String -- -o 
-    | OutputSheetName String -- -s
-    | FilterFields    String -- -F
-    | PassingColor    String -- -p (Default: #FFFF0000)
-    | FailingColor    String -- -f (Default: #FF00FF00)
-    | NAColor         String -- -n (Default: #FFC0C0C0)
-    | Help                   -- --help
+    = Verbose                   -- -v
+    | Version                   -- -V -?
+    | OutputFileType     String -- -t
+    | OutputFileName     String -- -o 
+    | OutputSheetName    String -- -s
+    | FilterFields       String -- -F
+    | BinaryPassingColor String -- -p (Default: #FFFF0000)
+    | BinaryFailingColor String -- -f (Default: #FF00FF00)
+    | TrinaryHeadColor   String -- -  (Default: #FFFF0000)
+    | TrinaryMiddleColor String -- -  (Default: #FFFFFF33)
+    | TrinaryTailColor   String -- -  (Default: #FF00FF00)
+    | NAColor            String -- -n (Default: #FFC0C0C0)
+    | Help                      -- --help
     deriving (Eq,Ord,Show) 
 
 {-----------------------------}
@@ -94,17 +98,35 @@ isFilterFields :: Flag -> Bool
 isFilterFields (FilterFields _) = True
 isFilterFields _                = False
 
---isPassingColor -> This function will
---test for the PassingColor Flag.
-isPassingColor :: Flag -> Bool
-isPassingColor (PassingColor _) = True
-isPassingColor _                = False
+--isBinaryPassingColor -> This function will
+--test for the BinaryPassingColor Flag.
+isBinaryPassingColor :: Flag -> Bool
+isBinaryPassingColor (BinaryPassingColor _) = True
+isBinaryPassingColor _                      = False
 
---isFailingColor -> This function will
---test for the FailingColor Flag.
-isFailingColor :: Flag -> Bool
-isFailingColor (FailingColor _) = True
-isFailingColor _                = False
+--isBinaryFailingColor -> This function will
+--test for the BinaryFailingColor Flag.
+isBinaryFailingColor :: Flag -> Bool
+isBinaryFailingColor (BinaryFailingColor _) = True
+isBinaryFailingColor _                      = False
+
+--isTrinaryHeadColor -> This function will
+--test for the TrinaryHeadColor Flag.
+isTrinaryHeadColor :: Flag -> Bool
+isTrinaryHeadColor (TrinaryHeadColor _) = True
+isTrinaryHeadColor _                    = False
+
+--isTrinaryMiddleColor -> This function will
+--test for the TrinaryMiddleColor Flag.
+isTrinaryMiddleColor :: Flag -> Bool
+isTrinaryMiddleColor (TrinaryMiddleColor _) = True
+isTrinaryMiddleColor _                      = False
+
+--isTrinaryTailColor -> This function will
+--test for the TrinaryTailColor Flag.
+isTrinaryTailColor :: Flag -> Bool
+isTrinaryTailColor (TrinaryTailColor _) = True
+isTrinaryTailColor _                    = False
 
 --isNAColor -> This function will
 --test for the NAColor Flag.
@@ -141,17 +163,35 @@ extractOutputSheetName (OutputSheetName x) = x
 extractFilterFields :: Flag -> String
 extractFilterFields (FilterFields x) = x
 
---extractPassingColor -> This function will
+--extractBinaryPassingColor -> This function will
 --extract the string associated with
---PassingColor.
-extractPassingColor :: Flag -> String
-extractPassingColor (PassingColor x) = x
+--BinaryPassingColor.
+extractBinaryPassingColor :: Flag -> String
+extractBinaryPassingColor (BinaryPassingColor x) = x
 
---extractFailingColor -> This function will
+--extractBinaryFailingColor -> This function will
 --extract the string associated with
---FailingColor.
-extractFailingColor :: Flag -> String
-extractFailingColor (FailingColor x) = x
+--BinaryFailingColor.
+extractBinaryFailingColor :: Flag -> String
+extractBinaryFailingColor (BinaryFailingColor x) = x
+
+--extractTrinaryHeadColor -> This function will
+--extract the string associated with
+--TrinaryHeadColor.
+extractTrinaryHeadColor :: Flag -> String
+extractTrinaryHeadColor (TrinaryHeadColor x) = x
+
+--extractTrinaryMiddleColor -> This function will
+--extract the string associated with
+--TrinaryMiddleColor.
+extractTrinaryMiddleColor :: Flag -> String
+extractTrinaryMiddleColor (TrinaryMiddleColor x) = x
+
+--extractTrinaryTailColor -> This function will
+--extract the string associated with
+--TrinaryTailColor.
+extractTrinaryTailColor :: Flag -> String
+extractTrinaryTailColor (TrinaryTailColor x) = x
 
 --extractNAColor -> This function will
 --extract the string associated with
@@ -168,19 +208,25 @@ extractNAColor (NAColor x) = x
 --describe flags.
 options :: [OptDescr Flag]
 options =
-    [ Option ['v']     ["verbose"]         (NoArg Verbose)                         "Output on stderr.",
-      Option ['V','?'] ["version"]         (NoArg Version)                         "Show version number.",
-      Option ['t']     ["outputfiletype"]  (ReqArg OutputFileType "OUTFILETYPE")   "The output file type (tsv or xlsx).",
-      Option ['o']     ["outputfilename"]  (ReqArg OutputFileName "OUTFILENAME")   "The output file name.",
-      Option ['s']     ["outputsheetname"] (ReqArg OutputSheetName "OUTSHEETNAME") "The string to be used as the xlsx sheet name.",
-      Option ['F']     ["filterfields"]    (ReqArg FilterFields "FIELDS")          "The fields to filter on.",
-      Option ['p']     ["passingcolor"]    (ReqArg PassingColor "PASSCOLOR")       "The ARGB hex value to use to fill passing cells with.\n\
-                                                                                   \Default value: #FFFF0000\n",
-      Option ['f']     ["failingcolor"]    (ReqArg FailingColor "FAILCOLOR")       "The ARGB hex value to use to fill failing cells with.\n\
-                                                                                   \Default value: #FF00FF00\n",
-      Option ['n']     ["nacolor"]         (ReqArg NAColor "NACOLOR")              "The ARGB hex value to use to fill non-filtered (NA) cells with.\n\
-                                                                                   \Default value: #FFC0C0C0\n",  
-      Option []        ["help"]            (NoArg Help)                            "Print this help message."
+    [ Option ['v']     ["verbose"]            (NoArg Verbose)                               "Output on stderr.",
+      Option ['V','?'] ["version"]            (NoArg Version)                               "Show version number.",
+      Option ['t']     ["outputfiletype"]     (ReqArg OutputFileType "OUTFILETYPE")         "The output file type (tsv or xlsx).",
+      Option ['o']     ["outputfilename"]     (ReqArg OutputFileName "OUTFILENAME")         "The output file name.",
+      Option ['s']     ["outputsheetname"]    (ReqArg OutputSheetName "OUTSHEETNAME")       "The string to be used as the xlsx sheet name.",
+      Option ['F']     ["filterfields"]       (ReqArg FilterFields "FIELDS")                "The fields to filter on.",
+      Option ['p']     ["binarypassingcolor"] (ReqArg BinaryPassingColor "BINARYPASSCOLOR") "The ARGB hex value to use to fill passing cells with.\n\
+                                                                                            \Default value: #FFFF0000\n",
+      Option ['f']     ["binaryfailingcolor"] (ReqArg BinaryFailingColor "BINARYFAILCOLOR") "The ARGB hex value to use to fill failing cells with.\n\
+                                                                                            \Default value: #FF00FF00\n",
+      Option ['h']     ["trinaryheadcolor"]   (ReqArg TrinaryHeadColor "TRINARYHEADCOLOR")  "The ARGB hex value to use to fill passing cells with.\n\
+                                                                                            \Default value: #FFFF0000\n",
+      Option ['m']     ["trinarymiddlecolor"] (ReqArg TrinaryMiddleColor "TRINARYMIDCOLOR") "The ARGB hex value to use to fill middle cells with.\n\
+                                                                                            \Default value: #FFFFFF33\n",
+      Option ['l']     ["trinarymiddlecolor"] (ReqArg TrinaryTailColor "TRINARYTAILCOLOR")  "The ARGB hex value to use to fill middle cells with.\n\
+                                                                                            \Default value: ##FF00FF00\n",
+      Option ['n']     ["nacolor"]            (ReqArg NAColor "NACOLOR")                    "The ARGB hex value to use to fill non-filtered (NA) cells with.\n\
+                                                                                            \Default value: #FFC0C0C0\n",  
+      Option []        ["help"]               (NoArg Help)                                  "Print this help message.\n"
     ] 
 
 {---------------------------------------------------------}
@@ -232,15 +278,19 @@ compilerOpts argv =
                do SIO.hPutStrLn stderr (outsheetnamemm ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isOutputSheetName) args) > 0) &&
-                 (not (isAlphaList (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
+                 (not (Main.isAlphaList (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
                do SIO.hPutStrLn stderr (outsheeterror ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isPassingColor) args) > 0) &&
-                 (not (isHexList (extractPassingColor (DL.head (DL.filter (isPassingColor) args))))) ->
+               | (DL.length (DL.filter (isBinaryPassingColor) args) > 0) &&
+                 (not (isHexList (extractBinaryPassingColor (DL.head (DL.filter (isBinaryPassingColor) args))))) ->
                do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isFailingColor) args) > 0) &&
-                 (not (isHexList (extractFailingColor (DL.head (DL.filter (isFailingColor) args))))) ->
+               | (DL.length (DL.filter (isBinaryFailingColor) args) > 0) &&
+                 (not (isHexList (extractBinaryFailingColor (DL.head (DL.filter (isBinaryFailingColor) args))))) ->
+               do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
+                  SX.exitWith (SX.ExitFailure 1)
+               | (DL.length (DL.filter (isTrinaryMiddleColor) args) > 0) &&
+                 (not (isHexList (extractTrinaryMiddleColor (DL.head (DL.filter (isTrinaryMiddleColor) args))))) ->
                do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isNAColor) args) > 0) &&
@@ -253,11 +303,11 @@ compilerOpts argv =
             SX.exitWith (SX.ExitFailure 1)
         where 
             greeting         = "Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.\n"
-            header           = "Usage: Fat [-vV?tosFpfn] [tsv]\n"
+            header           = "Usage: Fat [-vV?tosFpfhmln] [tsv]\n"
             version          = "Filtering Analysis Tool (FAT), Version 1.0.\n"
             github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n" 
             flerror          = "Incorrect number of input files:  Please provide one input file.\n"
-            fferror          = "Incorrect structure of the filtration string (;:~~;).\n"
+            fferror          = "Incorrect structure of the filtration string (;?:~~;).\n"
             ffmiss           = "Filtration string missing.\nPlease define a \ 
                                \filtration string using the -F (--filterfields) argument.\n"
             outtypes         = "Possible output file formats are tsv and xlsx.\n"
@@ -376,104 +426,6 @@ tuplifyTwo [x,y]     = (x,y)
 listifyTwo :: (a,a) -> [a]
 listifyTwo (x,y) = [x,y]
 
---customListFilter -> This function will
---perform a custom, regex-based filtration
---using the nested predicate functions.
-customListFilter :: [String] -> [[(String,Int,Int)]] -> [(String,Int,Int)]
-customListFilter [] _      = []
-customListFilter _  []      = []
-customListFilter xs (y:ys) = if smallCustomPredicate (DL.head xs) y
-                                 then y
-                                 else customListFilter xs ys
-    where
-        --Nested function definitions.--
-        --smallCustomPredicate
-        smallCustomPredicate :: String -> [(String,Int,Int)] -> Bool
-        smallCustomPredicate []     _       = False
-        smallCustomPredicate _      []      = False
-        smallCustomPredicate x ((y,_,_):ys) = if (y =~ x :: Bool)
-                                                  then True
-                                                  else smallCustomPredicate x ys
-        --------------------------------
-
---customOnlyDataFilter -> This function will
---perform a custom, regex-based partition
---using a custom predicate.
-customOnlyDataFilter :: [String] -> [(String,Int,Int)] -> [(String,Int,Int)]
-customOnlyDataFilter [] [] = []
-customOnlyDataFilter [] _  = []
-customOnlyDataFilter _  [] = []
-customOnlyDataFilter xs ys = smallCustomFilter (DL.head xs) ys
-     where 
-         --Nested function definitions.--
-         --smallCustomFilter
-         smallCustomFilter :: String -> [(String,Int,Int)] -> [(String,Int,Int)]
-         smallCustomFilter [] []     = []
-         smallCustomFilter [] _      = []
-         smallCustomFilter _  []     = []
-         smallCustomFilter x  (y:ys) = if smallCustomPredicate x y
-                                           then [y] ++ (smallCustomFilter x ys)
-                                           else smallCustomFilter x ys
-         --smallCustomPredicate
-         smallCustomPredicate :: String -> (String,Int,Int) -> Bool
-         smallCustomPredicate [] ([],_,_) = False
-         smallCustomPredicate _  ([],_,_) = False
-         smallCustomPredicate [] _        = False
-         smallCustomPredicate x  (y,_,_)  = if (y =~ x :: Bool)
-                                                then False 
-                                                else True 
-         --------------------------------
-
---customNotDataFilter -> This function will
---perform a custom, regex-based partition
---using a custom predicate.
-customNotDataFilter :: [String] -> [(String,Int,Int)] -> [(String,Int,Int)]
-customNotDataFilter [] [] = []
-customNotDataFilter [] _  = []
-customNotDataFilter _  [] = []
-customNotDataFilter xs ys = smallCustomFilter (DL.head xs) ys
-    where
-        --Nested function definitions.--
-        --smallCustomFilter
-        smallCustomFilter :: String -> [(String,Int,Int)] -> [(String,Int,Int)]
-        smallCustomFilter [] []     = []
-        smallCustomFilter [] _      = []
-        smallCustomFilter _  []     = []
-        smallCustomFilter x  (y:ys) = if smallCustomPredicate x y
-                                         then [y] ++ (smallCustomFilter x ys)
-                                         else smallCustomFilter x ys
-        --smallCustomPredicate
-        smallCustomPredicate :: String -> (String,Int,Int) -> Bool
-        smallCustomPredicate [] ([],_,_) = False
-        smallCustomPredicate _  ([],_,_) = False
-        smallCustomPredicate [] _        = False
-        smallCustomPredicate x  (y,_,_)  = if (y =~ x :: Bool)
-                                               then True
-                                               else False
-        --------------------------------
-
---customSplit -> This function will
---split a input by the basis of each
---characters character class.
-customSplit :: String -> [(String,String)]
-customSplit [] = []
-customSplit (x:xs) = if (DC.isDigit x) 
-                     || (DC.isLower x) 
-                     || (DC.isUpper x) 
-                     || (x == '.') 
-                     || (x == '-') 
-                     || (x == ',')
-                     || (x == '%')
-                     || (x == '_') 
-                         then [("",[x])] ++ customSplit xs
-                         else [([x],"")] ++ customSplit xs
-
---customAggregate -> This function will
---aggregate the result of customSplit.
-customAggregate :: [(String,String)] -> (String,String)
-customAggregate [] = ([],[])
-customAggregate xs = (DL.concat (DL.map (fst) xs),DL.concat (DL.map (snd) xs))
-
 --singleunnest -> This function will
 --unnest a list.
 singleunnest :: [a] -> a
@@ -489,34 +441,6 @@ smallSort (x:xs) = [DL.sortBy (\(_,_,a) (_,_,b) -> compare a b) x] ++ (smallSort
 --serve as a stronger version of ==.
 strongEq :: (Eq a) => [a] -> [a] -> Bool
 strongEq x y = DL.null (x DL.\\ y) && DL.null (y DL.\\ x)
-
---equalityListCheck -> This function will
---serve to grab all elements for == filter.
-equalityListCheck :: [String] -> [(String,Int,Int)] -> [[(String,String)]]
-equalityListCheck _ []  = []
-equalityListCheck [] _  = []
-equalityListCheck xs (y:ys) = [smallEqualityListCheck xs y] ++ (equalityListCheck xs ys)   
-    where
-        --Nested function definitions.--
-        --smallEqualityListCheck
-        smallEqualityListCheck :: [String] -> (String,Int,Int) -> [(String,String)]
-        smallEqualityListCheck [] (_,_,_)  = []
-        smallEqualityListCheck _  ([],_,_) = []
-        smallEqualityListCheck xs y        = if (tripletFst y) /= "NA" ||
-                                                (tripletFst y) /= "N/A" 
-                                                 then if smallPredicate xs [tripletFst y]
-                                                     then [(tripletFst y,"Y")]
-                                                     else [(tripletFst y,"N")] 
-                                                 else [(tripletFst y,"NA")]
-        --smallPredicate
-        smallPredicate :: [String] -> [String] -> Bool
-        smallPredicate [] _  = False
-        smallPredicate _  [] = False
-        smallPredicate xs ys = if ys `isSubsetOf` xs
-                                   then True
-                                   else False
-                               
-        --------------------------------
 
 {----------------------------}
 
@@ -545,224 +469,28 @@ checkOutputFileTypeAndOutputFileNameFormat xs ys = if (xs == "tsv" && (ys =~ ("\
 --generate the list of acceptable
 --numbers of filterfield delimiters.
 ffgenerator :: [Int] -> [Int]
-ffgenerator xs = xs ++ ffgenerator (DL.map (\n -> n + 4) xs)
+ffgenerator xs = xs ++ ffgenerator (DL.map (\n -> n + 5) xs)
 
 --filterFieldsCheck -> This function will
 --check for the appropriate number of 
 --delimiters present in FilterFields.
 filterFieldsCheck :: String -> Bool
 filterFieldsCheck xs = if (DL.elem flaglength ffdelimiterlengths) && 
-                          ((DL.filter (flip DL.elem (";:~" :: String)) xs) == ffdelimitercycler)
+                          ((DL.filter (flip DL.elem ("?;:~" :: String)) xs) == ffdelimitercycler)
                            then True
                            else False
     where
-        flaglength         = DL.length (DL.filter (flip DL.elem (";:~" :: String)) xs)
-        ffdelimiterlengths = DL.take (DL.length (DL.filter (flip DL.elem (";:~" :: String)) xs))
-                           $ ffgenerator [5]
-        ffdelimitercycler = DL.concat (DL.take (DL.length (DL.filter (flip DL.elem (";:~" :: String)) xs)) 
-                            (DL.cycle [";",":","~","~"]))
+        flaglength         = DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs)
+        ffdelimiterlengths = DL.take (DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs))
+                           $ ffgenerator [6]
+        ffdelimitercycler = DL.concat (DL.take (DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs)) 
+                            (DL.cycle [";","?",":","~","~"]))
 
 --indexAdder -> This function will 
 --add indexes to the input list.
 indexAdder :: [[String]] -> [[(String,Int,Int)]]
 indexAdder [] = []
 indexAdder xs = orderList xs (matchedReplication xs [0..(DL.length xs - 1)]) (nestedCycle xs [0..])
-
---specificFilters -> This function will
---applied the prepared specific filtration
---elucidated by filterFields.
-specificFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,String)]]
-specificFilters [] [] = []
-specificFilters [] _  = []
-specificFilters _  [] = []
-specificFilters (x:xs) ys = do
-    --Grab the sublist of ys that matches x (on head).
-    let matchedys = customListFilter x ys
-    --Grab the entire portion of matchedys that isn't the column header.
-    let onlydata = customOnlyDataFilter x matchedys 
-    --Grab the entire portion of matchedys that is the column header.
-    let notdata = customNotDataFilter x matchedys
-    --Grab !! 1 of x.
-    let onex = x DL.!! 1
-    --Grab !! 2 of x.
-    let twox = x DL.!! 2 
-    --Grab !! 3 of x.
-    let threex = x DL.!! 3
-    --Grab the comparision tuple from threex.
-    let threexcomparison = customAggregate (customSplit threex)   
-    --Walk through all possibilities of entire field of delimiters.
-    if | (isNotAlphaList onex) && 
-         (DL.elem '+' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N") 
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '/' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y 
-                                   then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '+' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '/' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '+' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '/' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '+' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") -> 
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '/' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '-' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") -> 
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '-' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '-' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y 
-                                   then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '-' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") && 
-         (snd (tuplifyTwo (DLS.splitOn "," onex)) == "_") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y 
-                                   then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf ">=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "_") && 
-         (snd (tuplifyTwo (DLS.splitOn "," onex)) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) >= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") && 
-         (snd (tuplifyTwo (DLS.splitOn "," onex)) == "_") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isNotAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf "<=" threex) && 
-         ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "_") && 
-         (snd (tuplifyTwo (DLS.splitOn "," onex)) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) <= 
-                                           (read (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
-       | (isAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf ">=" threex) ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          ((DL.map (\(y,_,_) -> if y /= "NA" ||
-                                   y /= "N/A"
-                                    then if (((read :: String -> Double) y) >= 
-                                            ((read :: String -> Double) (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                    else (y,"NA")) onlydata)))] ++ (specificFilters xs ys)
-       | (isAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf "<=" threex) ->
-         [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++ 
-          ((DL.map (\(y,_,_) -> if y /= "NA" ||
-                                   y /= "N/A"
-                                    then if (((read :: String -> Double) y) <= 
-                                            ((read :: String -> Double) (snd threexcomparison))) then (y,"Y") else (y,"N")
-                                    else (y,"NA")) onlydata)))] ++ (specificFilters xs ys)
-       | (isAlphaList onex) && 
-         (DL.elem '|' twox) && 
-         (DL.isInfixOf "==" threex) ->
-           [((DL.map (\(x,_,_) -> (x,"H")) notdata) ++
-            (DL.concat (equalityListCheck (DLS.splitOneOf "%" (snd threexcomparison)) onlydata)))] ++ (specificFilters xs ys)
-       | otherwise -> specificFilters xs ys
  
 --addNonFilters -> This function will
 --add back the non-filtered fields.
@@ -770,7 +498,7 @@ addNonFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,String)]] -> [[
 addNonFilters [] []    (_:_) = []
 addNonFilters [] (_:_) _     = []
 addNonFilters [] []    []    = []
-addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.head) xs) ys) ++ zs
+addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
     where
         --Nested Function Definitions.--
         --regexFilter
@@ -779,7 +507,7 @@ addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.head) xs) ys) ++ zs
         regexFilter [] _      = []
         regexFilter _  []     = []
         regexFilter xs (y:ys) = if regexPredicate xs y
-                                    then [[(tripletFst (DL.head y),"H")] 
+                                    then [[(Main.tripletFst (DL.head y),"HEADER")] 
                                       ++ (DL.map (\(x,_,_) -> (x,"NA")) (DL.tail y))] 
                                       ++ (regexFilter xs ys)
                                     else regexFilter xs ys
@@ -787,7 +515,7 @@ addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.head) xs) ys) ++ zs
         regexPredicate :: [String] -> [(String,Int,Int)] -> Bool
         regexPredicate []  _ = False
         regexPredicate _  [] = False 
-        regexPredicate xs ys = if (tripletFst (DL.head ys)) `DL.elem` xs 
+        regexPredicate xs ys = if (Main.tripletFst (DL.head ys)) `DL.elem` xs 
                                    then False
                                    else True 
         --------------------------------
@@ -799,51 +527,53 @@ reorderList [] [] = []
 reorderList [] _  = []
 reorderList _  [] = []
 reorderList xs ys = DL.nub (DL.concatMap (\a -> DL.filter (\(b:bs) -> 
-                                                          (fst b) == (tripletFst a))  ys) 
+                                                          (fst b) == (Main.tripletFst a))  ys) 
                            (DL.map (DL.head) xs))
 
 --filterFields -> This function will
 --filter a field by the corresponding
 --field.
 filterFields :: [Flag] -> [[String]] -> [[String]]
-filterFields []    []    = []
-filterFields opts  xs    = if (DL.length (DL.filter (isFilterFields) opts) > 0)
-                               then do
-                                   --Grab just "FIELDS". 
-                                   let ffields = (singleunnest (DL.filter (isFilterFields) opts))
-                                   --Extract the string from FilterFields. 
-                                   let ffstring = extractFilterFields ffields
-                                   --Remove beginning and ending delimiters.
-                                   let begendremoved = DL.init (DL.tail ffstring)
-                                   --Push the separate filtrations into a list.
-                                   let filteringlist = DLS.splitOn ";" begendremoved
-                                   --Get the field separated from the filtration condition.
-                                   let fieldandcondition = DL.map (DLS.splitOneOf ":~") filteringlist 
-                                   --Add indexes to xs.
-                                   let indexedxs = indexAdder xs
-                                   --Call specificFilters on fieldandcondition. 
-                                   let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
-                                   --Add back the nonfilteredlists.
-                                   let nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered 
-                                   --Reorder nonfiltersadded.
-                                   let reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded 
-                                   --Tranpose reorderedlist.
-                                   let transposedreorderedlist = DL.transpose reorderedlist 
-                                   --Turn tuples into lists.
-                                   let transformedtransposedlist = DL.map (DL.map (\x -> DL.intercalate "," x))
-                                                                          (DL.map (DL.map (\x -> listifyTwo x))
-                                                                           transposedreorderedlist) 
-                                   --Add Pass or Fail remark to end of all but first list of lists.
-                                   let prefinalizedtransposedlist = [DL.head transformedtransposedlist]
-                                                                 ++ (DL.map (\x -> 
-                                                                          if (DL.any (\y -> DL.isSuffixOf ",N" y) x) 
-                                                                              then x ++ ["Fail"] 
-                                                                              else x ++ ["Pass"]) 
-                                                                             (DL.tail transformedtransposedlist))
-                                   --Add extra column header to Name Pass/Fail column just added.
-                                   [DL.head prefinalizedtransposedlist ++ ["Filtering_Status"]] 
-                                                                       ++ (DL.tail prefinalizedtransposedlist)
-                           else xs
+filterFields []   [] = []
+filterFields opts xs = do --Grab just "FIELDS". 
+                          let ffields = singleunnest (DL.filter (isFilterFields) opts)
+                          --Extract the string from FilterFields. 
+                          let ffstring = extractFilterFields ffields
+                          --Remove beginning and ending delimiters.
+                          let begendremoved = DL.init (DL.tail ffstring)
+                          --Push the separate filtrations into a list.
+                          let filteringlist = DLS.splitOn ";" begendremoved
+                          --Get the field separated from the filtration condition.
+                          let fieldandcondition = DL.map (DLS.splitOneOf "?:~") filteringlist 
+                          --Add indexes to xs.
+                          let indexedxs = indexAdder xs
+                          --Call specificFilters on fieldandcondition. 
+                          let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
+                          --Add back the nonfilteredlists.
+                          let nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered 
+                          --Reorder nonfiltersadded.
+                          let reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded 
+                          --Tranpose reorderedlist.
+                          let transposedreorderedlist = DL.transpose reorderedlist 
+                          --Turn tuples into lists.
+                          let transformedtransposedlist = DL.map (DL.map (\x -> DL.intercalate "," x))
+                                                                 (DL.map (DL.map (\x -> listifyTwo x))
+                                                                  transposedreorderedlist) 
+                          --Add Pass or Fail remark to end of all but first list of lists.
+                          let prefinalizedtransposedlist = [DL.head transformedtransposedlist]
+                                                        ++ (DL.map (\x -> 
+                                                               if (DL.any (\y -> DL.isSuffixOf ",BINARYNO" y) x) 
+                                                                                 then x ++ ["Fail"]
+                                                                                 else if (DL.all (\y -> (DL.isSuffixOf ",NA" y) ||
+                                                                                                        (DL.isSuffixOf ",TRINARYHEAD" y) ||
+                                                                                                        (DL.isSuffixOf ",TRINARYMIDDLE" y) ||
+                                                                                                        (DL.isSuffixOf ",TRINARYTAIL" y)) x)
+                                                                                     then x ++ ["Not filtered"]
+                                                                                     else x ++ ["Pass"]) 
+                                                           (DL.tail transformedtransposedlist))
+                          --Add extra column header to Name Pass/Fail column just added.
+                          [DL.head prefinalizedtransposedlist ++ ["Filtering Status"]] 
+                                                              ++ (DL.tail prefinalizedtransposedlist) 
 
 {-------------------------}
 
@@ -857,38 +587,68 @@ createCellMap :: [String] -> [(Int,Int)] -> [((Int,Int),Cell)]
 createCellMap []     []     = []
 createCellMap _      []     = []
 createCellMap []     _      = []
-createCellMap (x:xs) (y:ys) =    --Header fields (":H").
-                              if | ":H" `DL.isSuffixOf` x || x == "Filtering_Status" ->
+createCellMap (x:xs) (y:ys) = --Header fields (":HEADER").
+                              if | ":HEADER" `DL.isSuffixOf` x || x == "Filtering Status" ->
                                    ([(y,Cell { _cellStyle = Just 1
                                              , _cellValue = Just (CellText 
                                                                  (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":H$") x "")))
+                                                                 (TR.subRegex (TR.mkRegex ":HEADER$") x "")))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                     )]) ++ (createCellMap xs ys)
-                                 --Passing fields (":Y").
-                                 | ":Y" `DL.isSuffixOf` x || x == "Pass" ->
+                                 --Binary passing fields (":BINARYYES").
+                                 | ":BINARYYES" `DL.isSuffixOf` x || x == "Pass" ->
                                    ([(y,Cell { _cellStyle = Just 2
                                              , _cellValue = Just (CellText 
                                                                  (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":Y$") x "")))
+                                                                 (TR.subRegex (TR.mkRegex ":BINARYYES$") x "")))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                    )]) ++ (createCellMap xs ys)
-                                 --Failing fields (":N").
-                                 | ":N" `DL.isSuffixOf` x || x == "Fail" ->
+                                 --Binary failing fields (":BINARYNO").
+                                 | ":BINARYNO" `DL.isSuffixOf` x || x == "Fail" ->
                                    ([(y,Cell { _cellStyle = Just 4
                                              , _cellValue = Just (CellText 
                                                                  (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":N$") x "")))
+                                                                 (TR.subRegex (TR.mkRegex ":BINARYNO$") x "")))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                    )]) ++ (createCellMap xs ys)
+                                 --Trinary HEAD fields (":TRINARYHEAD").
+                                 | ":TRINARYHEAD" `DL.isSuffixOf` x ->
+                                   ([(y,Cell { _cellStyle = Just 7
+                                             , _cellValue = Just (CellText
+                                                                 (DText.pack
+                                                                 (TR.subRegex (TR.mkRegex ":TRINARYHEAD$") x "")))
+                                             , _cellComment = Nothing
+                                             , _cellFormula = Nothing
+                                             }
+                                   )]) ++ (createCellMap xs ys)
+                                 --Trinary MIDDLE fields (":TRINARYMIDDLE").
+                                 | ":TRINARYMIDDLE" `DL.isSuffixOf` x ->
+                                   ([(y,Cell { _cellStyle = Just 6
+                                             , _cellValue = Just (CellText
+                                                                 (DText.pack
+                                                                 (TR.subRegex (TR.mkRegex ":TRINARYMIDDLE$") x "")))
+                                             , _cellComment = Nothing
+                                             , _cellFormula = Nothing
+                                             }
+                                   )]) ++ (createCellMap xs ys)
+                                 --Trinary TAIL fields (":TRINARYTAIL").
+                                 | ":TRINARYTAIL" `DL.isSuffixOf` x ->
+                                   ([(y,Cell { _cellStyle = Just 5
+                                             , _cellValue = Just (CellText
+                                                                 (DText.pack
+                                                                 (TR.subRegex (TR.mkRegex ":TRINARYTAIL$") x "")))
+                                             , _cellComment = Nothing
+                                             , _cellFormula = Nothing
+                                             }
+                                   )]) ++ (createCellMap xs ys)
                                  --NA fields (":NA").
-                                 | ":NA" `DL.isSuffixOf` x ->
+                                 | ":NA" `DL.isSuffixOf` x || x == "Not filtered" ->
                                    ([(y,Cell { _cellStyle = Just 3
                                              , _cellValue = Just (CellText 
                                                                  (DText.pack 
@@ -912,9 +672,12 @@ createAndPrintXlsx opts xs = do
     --Extract the string from OutputFileName.
     let outfilenamestring = extractOutputFileName outfilename
     --Change commas to colons. 
-    let fixedxs = DL.map (DL.map (\x -> if (x =~ ",H$" :: Bool) then (TR.subRegex (TR.mkRegex ",H$") x ":H")
-                                        else if (x =~ ",Y$" :: Bool) then (TR.subRegex (TR.mkRegex ",Y$") x ":Y")
-                                        else if (x =~ ",N$" :: Bool) then (TR.subRegex (TR.mkRegex ",N$") x ":N")
+    let fixedxs = DL.map (DL.map (\x -> if (x =~ ",HEADER$" :: Bool) then (TR.subRegex (TR.mkRegex ",HEADER$") x ":HEADER")
+                                        else if (x =~ ",BINARYYES$" :: Bool) then (TR.subRegex (TR.mkRegex ",BINARYYES$") x ":BINARYYES")
+                                        else if (x =~ ",BINARYNO$" :: Bool) then (TR.subRegex (TR.mkRegex ",BINARYNO$") x ":BINARYNO")
+                                        else if (x =~ ",TRINARYHEAD$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYHEAD$") x ":TRINARYHEAD")
+                                        else if (x =~ ",TRINARYMIDDLE$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYMIDDLE$") x ":TRINARYMIDDLE")
+                                        else if (x =~ ",TRINARYTAIL$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYTAIL$") x ":TRINARYTAIL")
                                         else if (x =~ ",NA$" :: Bool) then (TR.subRegex (TR.mkRegex ",NA$") x ":NA")
                                         else x)) xs
     --Calculate xy-coordinates (1-based) for fixedxs.

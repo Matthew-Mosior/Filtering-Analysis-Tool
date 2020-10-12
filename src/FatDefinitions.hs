@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 1.0=-}
+{-=Version: 2.0=-}
 {-=Synopsis:  This Haskell Script will take in=-}
 {-=a tsv file and provide a in-depth view of=-}
 {-=the user-defined filtering schema provided.=-}
@@ -128,7 +128,7 @@ defaultwsprotection = Nothing
 defaultwssharedformulas :: Map SharedFormulaIndex SharedFormulaOptions
 defaultwssharedformulas = (fromList []) ::  Map SharedFormulaIndex SharedFormulaOptions
 
---Defines default StyleSheet.
+--Defines the default StyleSheet.
 defaultstylesheet :: StyleSheet
 defaultstylesheet = StyleSheet
     { _styleSheetBorders =
@@ -306,6 +306,93 @@ defaultstylesheet = StyleSheet
                 )
             , _cellXfProtection = Nothing
             }
+        , CellXf
+            { _cellXfApplyAlignment = Just True
+            , _cellXfApplyBorder = Nothing
+            , _cellXfApplyFill = Just True
+            , _cellXfApplyFont = Nothing
+            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyProtection = Nothing
+            , _cellXfBorderId = Just 0
+            , _cellXfFillId = Just 5
+            , _cellXfFontId = Just 0
+            , _cellXfNumFmtId = Just 0
+            , _cellXfPivotButton = Nothing
+            , _cellXfQuotePrefix = Nothing
+            , _cellXfId = Just 0
+            , _cellXfAlignment = Just
+                ( Alignment
+                    { _alignmentHorizontal = Just CellHorizontalAlignmentCenter
+                    , _alignmentIndent = Nothing
+                    , _alignmentJustifyLastLine = Nothing
+                    , _alignmentReadingOrder = Nothing
+                    , _alignmentRelativeIndent = Nothing
+                    , _alignmentShrinkToFit = Nothing
+                    , _alignmentTextRotation = Nothing
+                    , _alignmentVertical = Nothing
+                    , _alignmentWrapText = Nothing
+                    }
+                )
+            , _cellXfProtection = Nothing
+            }
+        , CellXf
+            { _cellXfApplyAlignment = Just True
+            , _cellXfApplyBorder = Nothing
+            , _cellXfApplyFill = Just True
+            , _cellXfApplyFont = Nothing
+            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyProtection = Nothing
+            , _cellXfBorderId = Just 0
+            , _cellXfFillId = Just 6
+            , _cellXfFontId = Just 0
+            , _cellXfNumFmtId = Just 0
+            , _cellXfPivotButton = Nothing
+            , _cellXfQuotePrefix = Nothing
+            , _cellXfId = Just 0
+            , _cellXfAlignment = Just
+                ( Alignment
+                    { _alignmentHorizontal = Just CellHorizontalAlignmentCenter
+                    , _alignmentIndent = Nothing
+                    , _alignmentJustifyLastLine = Nothing
+                    , _alignmentReadingOrder = Nothing
+                    , _alignmentRelativeIndent = Nothing
+                    , _alignmentShrinkToFit = Nothing
+                    , _alignmentTextRotation = Nothing
+                    , _alignmentVertical = Nothing
+                    , _alignmentWrapText = Nothing
+                    }
+                )
+            , _cellXfProtection = Nothing
+            }
+        , CellXf
+            { _cellXfApplyAlignment = Just True
+            , _cellXfApplyBorder = Nothing
+            , _cellXfApplyFill = Just True
+            , _cellXfApplyFont = Nothing
+            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyProtection = Nothing
+            , _cellXfBorderId = Just 0
+            , _cellXfFillId = Just 7
+            , _cellXfFontId = Just 0
+            , _cellXfNumFmtId = Just 0
+            , _cellXfPivotButton = Nothing
+            , _cellXfQuotePrefix = Nothing
+            , _cellXfId = Just 0
+            , _cellXfAlignment = Just
+                ( Alignment
+                    { _alignmentHorizontal = Just CellHorizontalAlignmentCenter
+                    , _alignmentIndent = Nothing
+                    , _alignmentJustifyLastLine = Nothing
+                    , _alignmentReadingOrder = Nothing
+                    , _alignmentRelativeIndent = Nothing
+                    , _alignmentShrinkToFit = Nothing
+                    , _alignmentTextRotation = Nothing
+                    , _alignmentVertical = Nothing
+                    , _alignmentWrapText = Nothing
+                    }
+                )
+            , _cellXfProtection = Nothing
+            }  
         ]
     , _styleSheetFills =
         [ Fill
@@ -364,6 +451,75 @@ defaultstylesheet = StyleSheet
                         ( Color
                             { _colorAutomatic = Nothing
                             , _colorARGB = Just (DText.pack "FFC0C0C0")
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternType = Just PatternTypeSolid
+                    }
+                )
+            }
+        , Fill
+            { _fillPattern = Just
+                ( FillPattern
+                    { _fillPatternBgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Nothing
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternFgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Just (DText.pack "FFFF0000")
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternType = Just PatternTypeSolid
+                    }
+                )
+            }
+        , Fill
+            { _fillPattern = Just
+                ( FillPattern
+                    { _fillPatternBgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Nothing
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternFgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Just (DText.pack "FF00FF00")
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternType = Just PatternTypeSolid
+                    }
+                )
+            }
+        , Fill
+            { _fillPattern = Just
+                ( FillPattern
+                    { _fillPatternBgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Nothing
+                            , _colorTheme = Nothing
+                            , _colorTint = Nothing
+                            }
+                        )
+                    , _fillPatternFgColor = Just
+                        ( Color
+                            { _colorAutomatic = Nothing
+                            , _colorARGB = Just (DText.pack "FFFFFF33")
                             , _colorTheme = Nothing
                             , _colorTint = Nothing
                             }

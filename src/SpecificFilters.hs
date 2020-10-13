@@ -239,7 +239,8 @@ equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d))
         smallerEqualityListCheckTrinaryHead _  ([],_,_) = []
         smallerEqualityListCheckTrinaryHead xs y        = if (tripletFst y) /= "NA" ||
                                                              (tripletFst y) /= "N/A"
-                                                              then if DL.any (\x -> DL.isInfixOf "<=" x) xs
+                                                              then if DL.any (\x -> DL.isInfixOf "<=" x) xs ||
+                                                                      DL.any (\x -> DL.isInfixOf ">=" x) xs
                                                                   then if smallPredicateNumericTrinaryHead (DL.concat xs) 
                                                                                                            (tripletFst y)
                                                                       then [quadrupletTransform (y,"TRINARYHEAD")]
@@ -260,7 +261,8 @@ equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d))
         smallerEqualityListCheckTrinaryMiddle _  ([],_,_) = []
         smallerEqualityListCheckTrinaryMiddle xs y        = if (tripletFst y) /= "NA" ||
                                                                (tripletFst y) /= "N/A"
-                                                                then if DL.any (\x -> DL.isInfixOf "<=" x) xs
+                                                                then if DL.any (\x -> DL.isInfixOf "<=" x) xs ||
+                                                                        DL.any (\x -> DL.isInfixOf ">=" x) xs
                                                                     then if smallPredicateNumericTrinaryMiddle (DL.concat xs) 
                                                                                                                (tripletFst y)
                                                                         then [quadrupletTransform (y,"TRINARYMIDDLE")]
@@ -281,7 +283,8 @@ equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d))
         smallerEqualityListCheckTrinaryTail _  ([],_,_) = []
         smallerEqualityListCheckTrinaryTail xs y        = if (tripletFst y) /= "NA" ||
                                                              (tripletFst y) /= "N/A"
-                                                              then if DL.any (\x -> DL.isInfixOf "<=" x) xs
+                                                              then if DL.any (\x -> DL.isInfixOf "<=" x) xs ||
+                                                                      DL.any (\x -> DL.isInfixOf ">=" x) xs
                                                                   then if smallPredicateNumericTrinaryTail (DL.concat xs) 
                                                                                                            (tripletFst y)
                                                                       then [quadrupletTransform (y,"TRINARYTAIL")]
@@ -306,29 +309,46 @@ equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d))
         smallPredicateNumericTrinaryHead :: String -> String -> Bool
         smallPredicateNumericTrinaryHead [] _  = False
         smallPredicateNumericTrinaryHead _  [] = False
-        smallPredicateNumericTrinaryHead xs ys = if ((read ys) :: Double) <= 
+        smallPredicateNumericTrinaryHead xs ys = if DL.isInfixOf "<=" xs &&
+                                                    ((read ys) :: Double) <= 
                                                     (read (TR.subRegex (TR.mkRegex "<=") xs "") :: Double)
-                                                     then True 
-                                                     else False
+                                                     then True
+                                                     else if DL.isInfixOf ">=" xs &&
+                                                             ((read ys) :: Double) >=
+                                                             (read (TR.subRegex (TR.mkRegex ">=") xs "") :: Double)
+                                                         then True
+                                                         else False 
         --smallPredicateNumericTrinaryMiddle
         smallPredicateNumericTrinaryMiddle :: String -> String -> Bool
         smallPredicateNumericTrinaryMiddle [] _  = False
         smallPredicateNumericTrinaryMiddle _  [] = False
-        smallPredicateNumericTrinaryMiddle xs ys = if ((read ys) :: Double) >=
+        smallPredicateNumericTrinaryMiddle xs ys = if DL.isInfixOf "<=" xs &&
+                                                      ((read ys) :: Double) >=
                                                       ((read :: String -> Double) (DL.head (DLS.splitOn "<=" xs))) &&
                                                       ((read ys) :: Double) <=
                                                       ((read :: String -> Double) (DL.last (DLS.splitOn "<=" xs)))
                                                        then True
-                                                       else False
+                                                       else if DL.isInfixOf ">=" xs &&
+                                                               ((read ys) :: Double) <=
+                                                               ((read :: String -> Double) (DL.head (DLS.splitOn ">=" xs))) &&
+                                                               ((read ys) :: Double) >=
+                                                               ((read :: String -> Double) (DL.last (DLS.splitOn ">=" xs)))
+                                                           then True
+                                                           else False
         --smallPredicateNumericTrinaryTail
         smallPredicateNumericTrinaryTail :: String -> String -> Bool
         smallPredicateNumericTrinaryTail [] _  = False
         smallPredicateNumericTrinaryTail _  [] = False
-        smallPredicateNumericTrinaryTail xs ys = if ((read ys) :: Double) >= 
+        smallPredicateNumericTrinaryTail xs ys = if DL.isInfixOf "<=" xs &&
+                                                    ((read ys) :: Double) >= 
                                                     (read (TR.subRegex (TR.mkRegex "<=") xs "") :: Double)
                                                      then True
-                                                     else False
-        --smallPredicateCharTrinary
+                                                     else if DL.isInfixOf ">=" xs &&
+                                                             ((read ys) :: Double) <=
+                                                             (read (TR.subRegex (TR.mkRegex ">=") xs "") :: Double)
+                                                         then True
+                                                         else False
+        --smallPredicateCharTrinary     
         smallPredicateCharTrinary :: [String] -> [String] -> Bool
         smallPredicateCharTrinary [] _  = False
         smallPredicateCharTrinary _  [] = False

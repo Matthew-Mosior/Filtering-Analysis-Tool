@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 2.0=-}
+{-=Version: 3.0=-}
 {-=Synopsis:  This Haskell Script will take in=-}
 {-=a tsv file and provide a in-depth view of=-}
 {-=the user-defined filtering schema provided.=-}

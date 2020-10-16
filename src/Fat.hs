@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 2.0=-}
+{-=Version: 3.0=-}
 {-=Synopsis:  This Haskell Script will take in=-} 
 {-=a tab-delimited file and provide a in-depth view=-} 
 {-=of the user-defined filtering schema provided.=-}
@@ -54,21 +54,22 @@ import Text.Regex.TDFA as TRP
 {-Custom CML Option Datatype.-}
 
 data Flag 
-    = Verbose                   -- -v
-    | Version                   -- -V -?
-    | OutputFileType     String -- -t
-    | OutputFileName     String -- -o 
-    | OutputSheetName    String -- -s
-    | FilterFields       String -- -F
-    | AddFilteringStatus        -- -S
-    | AddFilteringBinaries      -- -B
-    | BinaryPassingColor String -- -p (Default: #FFFF0000)
-    | BinaryFailingColor String -- -f (Default: #FF00FF00)
-    | TrinaryHeadColor   String -- -h (Default: #FFFF0000)
-    | TrinaryMiddleColor String -- -m (Default: #FFFFFF33)
-    | TrinaryTailColor   String -- -l (Default: #FF00FF00)
-    | NAColor            String -- -n (Default: #FFC0C0C0)
-    | Help                      -- --help
+    = Verbose                     -- -v
+    | Version                     -- -V -?
+    | OutputFileType       String -- -t
+    | OutputFileName       String -- -o 
+    | OutputSheetName      String -- -s
+    | FilterFields         String -- -F
+    | AddFilteringStatus          -- -S
+    | AddFilteringBinaries        -- -B
+    | CopyColumnFormatting String -- -c
+    | BinaryPassingColor   String -- -p (Default: #FFFF0000)
+    | BinaryFailingColor   String -- -f (Default: #FF00FF00)
+    | TrinaryHeadColor     String -- -h (Default: #FFFF0000)
+    | TrinaryMiddleColor   String -- -m (Default: #FFFFFF33)
+    | TrinaryTailColor     String -- -l (Default: #FF00FF00)
+    | NAColor              String -- -n (Default: #FFC0C0C0)
+    | Help                        -- --help
     deriving (Eq,Ord,Show) 
 
 {-----------------------------}
@@ -99,6 +100,12 @@ isOutputSheetName _                   = False
 isFilterFields :: Flag -> Bool
 isFilterFields (FilterFields _) = True
 isFilterFields _                = False
+
+--isCopyColumnFormatting -> This function will
+--test for CopyColumnFormatting flag.
+isCopyColumnFormatting :: Flag -> Bool
+isCopyColumnFormatting (CopyColumnFormatting _) = True
+isCopyColumnFormatting _                        = False
 
 --isBinaryPassingColor -> This function will
 --test for the BinaryPassingColor Flag.
@@ -165,6 +172,12 @@ extractOutputSheetName (OutputSheetName x) = x
 extractFilterFields :: Flag -> String
 extractFilterFields (FilterFields x) = x
 
+--extractCopyColumnFormatting -> This function will
+--extract the string associated with
+--CopyColumnFormatting.
+extractCopyColumnFormatting :: Flag -> String
+extractCopyColumnFormatting (CopyColumnFormatting x) = x
+
 --extractBinaryPassingColor -> This function will
 --extract the string associated with
 --BinaryPassingColor.
@@ -210,30 +223,32 @@ extractNAColor (NAColor x) = x
 --describe flags.
 options :: [OptDescr Flag]
 options =
-    [ Option ['v']     ["verbose"]              (NoArg Verbose)                               "Output on stderr.",
-      Option ['V','?'] ["version"]              (NoArg Version)                               "Show version number.",
-      Option ['t']     ["outputfiletype"]       (ReqArg OutputFileType "OUTFILETYPE")         "The output file type (tsv or xlsx).",
-      Option ['o']     ["outputfilename"]       (ReqArg OutputFileName "OUTFILENAME")         "The output file name.",
-      Option ['s']     ["outputsheetname"]      (ReqArg OutputSheetName "OUTSHEETNAME")       "The string to be used as the xlsx sheet name.",
-      Option ['F']     ["filterfields"]         (ReqArg FilterFields "FIELDS")                "The fields to filter on.",
-      Option ['S']     ["addfilteringstatus"]   (NoArg AddFilteringStatus)                    "Add column to end of file describing\n\
-                                                                                              \the filtering status of each row.\n",
-      Option ['B']     ["addfilteringbinaries"] (NoArg AddFilteringBinaries)                  "Add a column for each BINARY filter applied\n\
-                                                                                              \denoting whether that variant passed (1) or\n\
-                                                                                              \failed (0) that filter.\n",
-      Option ['p']     ["binarypassingcolor"]   (ReqArg BinaryPassingColor "BINARYPASSCOLOR") "The ARGB hex value to use to fill passing cells with.\n\
-                                                                                              \Default value: #FFFF0000\n",
-      Option ['f']     ["binaryfailingcolor"]   (ReqArg BinaryFailingColor "BINARYFAILCOLOR") "The ARGB hex value to use to fill failing cells with.\n\
-                                                                                              \Default value: #FF00FF00\n",
-      Option ['h']     ["trinaryheadcolor"]     (ReqArg TrinaryHeadColor "TRINARYHEADCOLOR")  "The ARGB hex value to use to fill head cells with.\n\
-                                                                                              \Default value: #FFFF0000\n",
-      Option ['m']     ["trinarymiddlecolor"]   (ReqArg TrinaryMiddleColor "TRINARYMIDCOLOR") "The ARGB hex value to use to fill middle cells with.\n\
-                                                                                              \Default value: #FFFFFF33\n",
-      Option ['l']     ["trinarytailcolor"]     (ReqArg TrinaryTailColor "TRINARYTAILCOLOR")  "The ARGB hex value to use to fill tail cells with.\n\
-                                                                                              \Default value: ##FF00FF00\n",
-      Option ['n']     ["nacolor"]              (ReqArg NAColor "NACOLOR")                    "The ARGB hex value to use to fill non-filtered (NA) cells with.\n\
-                                                                                              \Default value: #FFC0C0C0\n",  
-      Option []        ["help"]                 (NoArg Help)                                  "Print this help message.\n"
+    [ Option ['v']     ["verbose"]              (NoArg Verbose)                                      "Output on stderr.",
+      Option ['V','?'] ["version"]              (NoArg Version)                                      "Show version number.",
+      Option ['t']     ["outputfiletype"]       (ReqArg OutputFileType "OUTFILETYPE")                "The output file type (tsv or xlsx).",
+      Option ['o']     ["outputfilename"]       (ReqArg OutputFileName "OUTFILENAME")                "The output file name.",
+      Option ['s']     ["outputsheetname"]      (ReqArg OutputSheetName "OUTSHEETNAME")              "The string to be used as the xlsx sheet name.",
+      Option ['F']     ["filterfields"]         (ReqArg FilterFields "FIELDS")                       "The fields to filter on.",
+      Option ['S']     ["addfilteringstatus"]   (NoArg AddFilteringStatus)                           "Add column to end of file describing\n\
+                                                                                                     \the filtering status of each row.\n",
+      Option ['B']     ["addfilteringbinaries"] (NoArg AddFilteringBinaries)                         "Add a column for each BINARY filter applied\n\
+                                                                                                     \denoting whether that variant passed (1) or\n\
+                                                                                                     \failed (0) that filter.\n",
+      Option ['c']     ["copycolumnformatting"] (ReqArg CopyColumnFormatting "COPYCOLUMNFORMATTING") "Copy column formatting of one column to\n\
+                                                                                                     \to another column (row-wise).\n",
+      Option ['p']     ["binarypassingcolor"]   (ReqArg BinaryPassingColor "BINARYPASSCOLOR")        "The ARGB hex value to use to fill passing cells with.\n\
+                                                                                                     \Default value: #FFFF0000\n",
+      Option ['f']     ["binaryfailingcolor"]   (ReqArg BinaryFailingColor "BINARYFAILCOLOR")        "The ARGB hex value to use to fill failing cells with.\n\
+                                                                                                     \Default value: #FF00FF00\n",
+      Option ['h']     ["trinaryheadcolor"]     (ReqArg TrinaryHeadColor "TRINARYHEADCOLOR")         "The ARGB hex value to use to fill head cells with.\n\
+                                                                                                     \Default value: #FFFF0000\n",
+      Option ['m']     ["trinarymiddlecolor"]   (ReqArg TrinaryMiddleColor "TRINARYMIDCOLOR")        "The ARGB hex value to use to fill middle cells with.\n\
+                                                                                                     \Default value: #FFFFFF33\n",
+      Option ['l']     ["trinarytailcolor"]     (ReqArg TrinaryTailColor "TRINARYTAILCOLOR")         "The ARGB hex value to use to fill tail cells with.\n\
+                                                                                                     \Default value: ##FF00FF00\n",
+      Option ['n']     ["nacolor"]              (ReqArg NAColor "NACOLOR")                           "The ARGB hex value to use to fill non-filtered cells with.\n\
+                                                                                                     \Default value: #FFC0C0C0\n",  
+      Option []        ["help"]                 (NoArg Help)                                         "Print this help message.\n"
     ] 
 
 {---------------------------------------------------------}
@@ -310,7 +325,7 @@ compilerOpts argv =
             SX.exitWith (SX.ExitFailure 1)
         where 
             greeting         = "Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.\n"
-            header           = "Usage: Fat [-vV?tosFSpfhmln] [tsv]\n"
+            header           = "Usage: Fat [-vV?tosFSBcpfhmln] [tsv]\n"
             version          = "Filtering Analysis Tool (FAT), Version 1.0.\n"
             github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n" 
             flerror          = "Incorrect number of input files:  Please provide one input file.\n"
@@ -421,6 +436,16 @@ orderList (x:xs) (y:ys) (z:zs) = [DL.zip3 x y z] ++ (orderList xs ys zs)
 tripletFst :: (String,Int,Int) -> String
 tripletFst (x,y,z) = x
 
+--tripletSnd -> This function will
+--act as a snd but for a triplet.
+tripletSnd :: (String,Int,Int) -> Int
+tripletSnd (x,y,z) = y
+
+--tripletFst -> This function will
+--act to grab the third element of a triplet.
+tripletThrd :: (String,Int,Int) -> Int
+tripletThrd (x,y,z) = z
+
 --tuplifyTwo -> This function will
 --turn a list of two elements into
 --a two-tuple.
@@ -513,7 +538,7 @@ indexAdder xs = orderList xs (matchedReplication xs [0..(DL.length xs - 1)]) (ne
  
 --addNonFilters -> This function will
 --add back the non-filtered fields.
-addNonFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,String)]] -> [[(String,String)]]
+addNonFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
 addNonFilters [] []    (_:_) = []
 addNonFilters [] (_:_) _     = []
 addNonFilters [] []    []    = []
@@ -521,13 +546,13 @@ addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
     where
         --Nested function definitions.--
         --regexFilter
-        regexFilter :: [String] -> [[(String,Int,Int)]] -> [[(String,String)]]
+        regexFilter :: [String] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]]
         regexFilter [] []     = []
         regexFilter [] _      = []
         regexFilter _  []     = []
         regexFilter xs (y:ys) = if regexPredicate xs y
-                                    then [[(Main.tripletFst (DL.head y),"HEADER")] 
-                                      ++ (DL.map (\(x,_,_) -> (x,"NA")) (DL.tail y))] 
+                                    then [[quadrupletTransform ((DL.head y),"HEADER")] 
+                                      ++ (DL.map (\x -> quadrupletTransform (x,"NA")) (DL.tail y))] 
                                       ++ (regexFilter xs ys)
                                     else regexFilter xs ys
         --regexPredicate
@@ -541,52 +566,105 @@ addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
 
 --reorderList -> This function will
 --reorder a list based on another list.
-reorderList :: [[(String,Int,Int)]] -> [[(String,String)]] -> [[(String,String)]]
-reorderList [] [] = []
-reorderList [] _  = []
-reorderList _  [] = []
-reorderList xs ys = DL.nub (DL.concatMap (\a -> DL.filter (\(b:bs) -> 
-                                                          (fst b) == (Main.tripletFst a))  ys) 
-                           (DL.map (DL.head) xs))
+reorderList :: [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
+reorderList []     [] = []
+reorderList []     _  = []
+reorderList _      [] = []
+reorderList (x:xs) ys = (DL.filter (\y -> quadrupletFst (y DL.!! 0) == Main.tripletFst (x DL.!! 0) &&
+                                          quadrupletSnd (y DL.!! 0) == Main.tripletSnd (x DL.!! 0) &&
+                                          quadrupletThrd (y DL.!! 0) == Main.tripletThrd (x DL.!! 0)) ys)
+                     ++ (reorderList xs ys)
 
 --addFilteringBinaryColumns -> This function will
 --add filtering binary (0 or 1) to each row
 --for each filter.
-addFilteringBinaryColumns :: [[String]] -> [[String]] -> [[String]]
-addFilteringBinaryColumns []     [] = []
-addFilteringBinaryColumns _      [] = []
-addFilteringBinaryColumns []     _  = []
-addFilteringBinaryColumns (x:xs) ys = ys ++ (if | x DL.!! 0 == "BINARY" -> 
-                                                  [smallerAddFilteringBinaryColumns x ys] ++ (addFilteringBinaryColumns xs ys)
-                                                | otherwise -> addFilteringBinaryColumns xs ys)
+addFilteringBinaryColumns :: [[String]] -> [[(String,Int,Int,String)]] -> [Int] -> [[(String,Int,Int,String)]]
+addFilteringBinaryColumns []     [] []        = []
+addFilteringBinaryColumns []     []    (_:_)  = []
+addFilteringBinaryColumns []     (_:_) _      = []
+addFilteringBinaryColumns (_:_)  _     []     = []
+addFilteringBinaryColumns (x:xs) ys    (z:zs) = ys ++ ([smallerAddFilteringBinaryColumns x ys z] 
+                                                   ++  (addFilteringBinaryColumns xs ys zs))
     where
         --Nested function definitions.--
         --smallerAddFilteringBinaryColumns
-        smallerAddFilteringBinaryColumns :: [String] -> [[String]] -> [String]
-        smallerAddFilteringBinaryColumns [] [] = []
-        smallerAddFilteringBinaryColumns _  [] = []
-        smallerAddFilteringBinaryColumns [] _  = []
-        smallerAddFilteringBinaryColumns xs ys = smallestAddFilteringBinaryColumns (DL.concat (DL.filter (\(y:ys) -> ((xs DL.!! 1) ++ ",HEADER") == y) ys))
+        smallerAddFilteringBinaryColumns :: [String] -> [[(String,Int,Int,String)]] -> Int -> [(String,Int,Int,String)]
+        smallerAddFilteringBinaryColumns [] [] _  = []
+        smallerAddFilteringBinaryColumns _  [] _  = []
+        smallerAddFilteringBinaryColumns [] _  _  = []
+        smallerAddFilteringBinaryColumns xs ys zs = smallestAddFilteringBinaryColumns (DL.concat 
+                                                                                      (DL.filter (\(y:_) -> 
+                                                                                      ((xs DL.!! 1) == (quadrupletFst y))) 
+                                                                                      ys))
+                                                                                      (zs)
         --smallestAddFilteringBinaryColumns
-        smallestAddFilteringBinaryColumns :: [String] -> [String]
-        smallestAddFilteringBinaryColumns []     = []
-        smallestAddFilteringBinaryColumns (x:xs) = if | (x =~ ",NA$" :: Bool) ->
-                                                        ["1,FILTERCOLUMN"] ++ (smallestAddFilteringBinaryColumns xs)
-                                                      | (x =~ ",BINARYYES$" :: Bool) ->
-                                                        ["1,FILTERCOLUMN"] ++ (smallestAddFilteringBinaryColumns xs)
-                                                      | (x =~ ",BINARYNO$" :: Bool) ->
-                                                        ["0,FILTERCOLUMN"] ++ (smallestAddFilteringBinaryColumns xs)
-                                                    --  | otherwise -> smallestAddFilteringBinaryColumns xs
-                                                      | (x =~ ",HEADER$" :: Bool) ->
-                                                        [(TR.subRegex (TR.mkRegex ",HEADER$") x "") ++ "_BINARY,HEADER"] 
-                                                      ++ (smallestAddFilteringBinaryColumns xs)
-                                                      | otherwise -> smallestAddFilteringBinaryColumns xs   
+        smallestAddFilteringBinaryColumns :: [(String,Int,Int,String)] -> Int -> [(String,Int,Int,String)]
+        smallestAddFilteringBinaryColumns []             _  = []
+        smallestAddFilteringBinaryColumns ((a,b,_,d):xs) ys = if | (d == "NA") ->
+                                                                   [("1",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys)
+                                                                 | (d == "BINARYYES") ->
+                                                                   [("1",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys)
+                                                                 | (d == "BINARYNO") ->
+                                                                   [("0",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys) 
+                                                                 | (d == "HEADER") ->
+                                                                   [(a ++ "_BINARY",b,ys,"HEADER")] 
+                                                                 ++ (smallestAddFilteringBinaryColumns xs ys)
+                                                                 | otherwise -> smallestAddFilteringBinaryColumns xs ys
         --------------------------------
+
+--copyColumnFormatting -> This function will
+--copy the formatting of one column and apply
+--it to another non-filtered column.
+copyColumnFormatting :: [[(String,Int,Int,String)]] -> [(String,String)] -> [String] -> [[(String,Int,Int,String)]]
+copyColumnFormatting []    [] []    = []
+copyColumnFormatting []    [] (_:_) = []
+copyColumnFormatting (_:_) [] _     = []
+copyColumnFormatting xs    ys zs    = reorderFormatting 
+                                      (notdestinationcolumns ++ (applyFormatting xs ys))
+                                      xs
+    where
+        --Local functions.-- 
+        --applyFormatting
+        applyFormatting :: [[(String,Int,Int,String)]] -> [(String,String)] -> [[(String,Int,Int,String)]]
+        applyFormatting []    []     = []
+        applyFormatting []    _      = []
+        applyFormatting _     []     = []
+        applyFormatting xs    (y:ys) = [smallApplyFormatting sourcecolumn destinationcolumn] 
+                                    ++ (applyFormatting xs ys) 
+            where
+                --Local definitions.--
+                sourcecolumn = DL.concat (DL.filter (\x -> case x of
+                                                           [] -> False
+                                                           x  -> (fst y) == quadrupletFst (x DL.!! 0)) xs)
+                destinationcolumn = DL.concat (DL.filter (\x -> case x of
+                                                                [] -> False
+                                                                x  -> (snd y) == quadrupletFst (x DL.!! 0)) xs)
+                ----------------------
+        --smallApplyFormatting
+        smallApplyFormatting :: [(String,Int,Int,String)] -> [(String,Int,Int,String)] -> [(String,Int,Int,String)]
+        smallApplyFormatting []             []             = []
+        smallApplyFormatting _              []             = []
+        smallApplyFormatting []             _              = []
+        smallApplyFormatting ((_,_,_,d):xs) ((e,f,g,_):ys) = [(e,f,g,d)] ++ (smallApplyFormatting xs ys)
+        --reorderFormatting
+        reorderFormatting :: [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
+        reorderFormatting [] []     = []
+        reorderFormatting _  []     = []
+        reorderFormatting [] _      = []
+        reorderFormatting xs (y:ys) = (DL.filter (\a -> case a of
+                                                        [] -> False 
+                                                        a  -> quadrupletFst (a DL.!! 0) == quadrupletFst (y DL.!! 0) &&
+                                                              quadrupletSnd (a DL.!! 0) == quadrupletSnd (y DL.!! 0) &&
+                                                              quadrupletThrd (a DL.!! 0) == quadrupletThrd (y DL.!! 0)) xs)
+                                   ++ (reorderFormatting xs ys)
+        --Local definitions.--
+        notdestinationcolumns = DL.filter (\x-> (quadrupletFst (x DL.!! 0)) `DL.notElem` zs) xs
+        ----------------------
 
 --filterFields -> This function will
 --filter a field by the corresponding
 --field.
-filterFields :: [Flag] -> [[String]] -> [[String]]
+filterFields :: [Flag] -> [[String]] -> [[(String,Int,Int,String)]]
 filterFields []   [] = []
 filterFields opts xs = do --Grab just "FIELDS". 
                           let ffields = singleunnest (DL.filter (isFilterFields) opts)
@@ -608,53 +686,159 @@ filterFields opts xs = do --Grab just "FIELDS".
                           let reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded 
                           --Tranpose reorderedlist.
                           let transposedreorderedlist = DL.transpose reorderedlist 
-                          --Turn tuples into lists.
-                          let transformedtransposedlist = DL.map (DL.map (\x -> DL.intercalate "," x))
-                                                                 (DL.map (DL.map (\x -> listifyTwo x))
-                                                                  transposedreorderedlist)
-                          --Check for AddFilteringStatus flag.
+                               --User provides AddFilteringStatus and AddFilteringBinaries flag.
                           if | DL.elem AddFilteringStatus opts &&
                                DL.elem AddFilteringBinaries opts -> 
                              do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transformedtransposedlist]
+                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
                                                               ++ (DL.map (\x -> 
-                                                                     if (DL.any (\y -> DL.isSuffixOf ",BINARYNO" y) x) 
-                                                                                       then x ++ ["Fail"]
-                                                                                       else if (DL.all (\y -> (DL.isSuffixOf ",NA" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYHEAD" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYMIDDLE" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYTAIL" y)) x)
-                                                                                           then x ++ ["Not_filtered"]
-                                                                                           else x ++ ["Pass"]) 
-                                                                 (DL.tail transformedtransposedlist))
+                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x) 
+                                                                         then x ++ [("Fail"
+                                                                                    ,quadrupletSnd (DL.last x)
+                                                                                    ,(quadrupletThrd (DL.last x)) + 1
+                                                                                    ,"BINARYNO")]
+                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
+                                                                                                            (d == "TRINARYHEAD") ||
+                                                                                                            (d == "TRINARYMIDDLE") ||
+                                                                                                            (d == "TRINARYTAIL")) x)
+                                                                                 then x ++ [("Not_filtered"
+                                                                                            ,quadrupletSnd (DL.last x)
+                                                                                            ,(quadrupletThrd (DL.last x)) + 1
+                                                                                            ,"NA")]
+                                                                                 else x ++ [("Pass"
+                                                                                            ,quadrupletSnd (DL.last x)
+                                                                                            ,(quadrupletThrd (DL.last x)) + 1
+                                                                                            ,"BINARYYES")]) 
+                                                                 (DL.tail transposedreorderedlist))
                                 --Add extra column header to Name Pass/Fail column just added.
-                                let filteringstatus = [DL.head prefinalizedtransposedlist ++ ["Filtering_Status"]]
+                                let filteringstatus = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
+                                                                                              ,0
+                                                                                              ,DL.length prefinalizedtransposedlist + 1
+                                                                                              ,"HEADER")]]
                                                    ++ (DL.tail prefinalizedtransposedlist)
                                 --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                                DL.transpose (addFilteringBinaryColumns fieldandcondition (DL.transpose filteringstatus))  
+                                let finalfilteringstatus = DL.transpose (addFilteringBinaryColumns 
+                                                                        (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition) 
+                                                                        (DL.transpose filteringstatus)
+                                                                        ([((DL.length filteringstatus) + 1)..((DL.length filteringstatus) 
+                                                                      + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY") 
+                                                                        fieldandcondition)))]))
+                                --Check for CopyColumnFormatting flag.
+                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 -> 
+                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head 
+                                                                                                (DL.filter 
+                                                                                                (isCopyColumnFormatting) opts))
+                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
+                                                            (DL.map 
+                                                            (DLS.splitOn ":")
+                                                            (DLS.splitOn ";"
+                                                            (DL.init
+                                                            (DL.tail copycolumnformattingstr))))
+                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
+                                      --Return output of copyColumnFormatting.
+                                      DL.transpose (copyColumnFormatting (DL.transpose finalfilteringstatus) 
+                                                                         (allcolumnssplit)
+                                                                         (alldestinationcolumns))
+                                   | otherwise -> finalfilteringstatus 
+                                                   
+                                                    
+                               --User provides only AddFilteringStatus flag.
                              | DL.elem AddFilteringStatus opts &&
                                DL.notElem AddFilteringBinaries opts -> 
                              do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transformedtransposedlist]
+                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
                                                               ++ (DL.map (\x ->
-                                                                     if (DL.any (\y -> DL.isSuffixOf ",BINARYNO" y) x)
-                                                                                       then x ++ ["Fail"]
-                                                                                       else if (DL.all (\y -> (DL.isSuffixOf ",NA" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYHEAD" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYMIDDLE" y) ||
-                                                                                                              (DL.isSuffixOf ",TRINARYTAIL" y)) x)
-                                                                                           then x ++ ["Not_filtered"]
-                                                                                           else x ++ ["Pass"])
-                                                                 (DL.tail transformedtransposedlist))
+                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
+                                                                         then x ++ [("Fail"
+                                                                                    ,quadrupletSnd (DL.last x)
+                                                                                    ,(quadrupletThrd (DL.last x)) + 1
+                                                                                    ,"BINARYNO")]
+                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
+                                                                                                            (d == "TRINARYHEAD") ||
+                                                                                                            (d == "TRINARYMIDDLE") ||
+                                                                                                            (d == "TRINARYTAIL")) x)
+                                                                                 then x ++ [("Not_filtered"
+                                                                                            ,quadrupletSnd (DL.last x)
+                                                                                            ,(quadrupletThrd (DL.last x)) + 1
+                                                                                            ,"NA")]
+                                                                                 else x ++ [("Pass"
+                                                                                            ,quadrupletSnd (DL.last x)
+                                                                                            ,(quadrupletThrd (DL.last x)) + 1
+                                                                                            ,"BINARYYES")])
+                                                                 (DL.tail transposedreorderedlist))
                                 --Add extra column header to Name Pass/Fail column just added.
-                                [DL.head prefinalizedtransposedlist ++ ["Filtering_Status"]]
-                                                                    ++ (DL.tail prefinalizedtransposedlist) 
-
+                                let finalizedtransposedlist = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
+                                                                                                      ,0
+                                                                                                      ,DL.length prefinalizedtransposedlist + 1
+                                                                                                      ,"HEADER")]]
+                                                           ++ (DL.tail prefinalizedtransposedlist)
+                                --Check for CopyColumnFormatting flag.
+                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
+                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
+                                                                                                (DL.filter
+                                                                                                (isCopyColumnFormatting) opts))
+                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
+                                                            (DL.map
+                                                            (DLS.splitOn ":")
+                                                            (DLS.splitOn ";"
+                                                            (DL.init
+                                                            (DL.tail copycolumnformattingstr))))
+                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
+                                      --Return output of copyColumnFormatting.
+                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedtransposedlist)
+                                                                         (allcolumnssplit)
+                                                                         (alldestinationcolumns))
+                                   | otherwise -> finalizedtransposedlist 
+                                     
+                                      
+                               --User provides only AddFilteringBinaries flag.
                              | DL.notElem AddFilteringStatus opts &&
                                DL.elem AddFilteringBinaries opts -> 
-                               --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                               DL.transpose (addFilteringBinaryColumns fieldandcondition (DL.transpose transformedtransposedlist))
-                             | otherwise -> transformedtransposedlist 
+                             do --Add Pass (1) or Fail (0) binary notation to each filtered column.
+                                let finalizedbinarycolumns = DL.transpose (addFilteringBinaryColumns
+                                                                          (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                                                          (DL.transpose transposedreorderedlist)
+                                                                          ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
+                                                                        + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
+                                                                          fieldandcondition)))]))
+                                --Check for CopyColumnFormatting flag.
+                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
+                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
+                                                                                                (DL.filter
+                                                                                                (isCopyColumnFormatting) opts))
+                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
+                                                            (DL.map
+                                                            (DLS.splitOn ":")
+                                                            (DLS.splitOn ";"
+                                                            (DL.init
+                                                            (DL.tail copycolumnformattingstr))))
+                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
+                                      --Return output of copyColumnFormatting.
+                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedbinarycolumns)
+                                                                         (allcolumnssplit)
+                                                                         (alldestinationcolumns))
+                                   | otherwise -> finalizedbinarycolumns 
+                               --User didn't provide AddFilteringStatus or AddFilteringBinaries flag.
+                             | otherwise -> 
+                             do --Check for CopyColumnFormatting flag.
+                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
+                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
+                                                                                                (DL.filter
+                                                                                                (isCopyColumnFormatting) opts))
+                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
+                                                            (DL.map
+                                                            (DLS.splitOn ":")
+                                                            (DLS.splitOn ";"
+                                                            (DL.init
+                                                            (DL.tail copycolumnformattingstr))))
+                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
+                                      --Return output of copyColumnFormatting.
+                                      DL.transpose (copyColumnFormatting (DL.transpose transposedreorderedlist)
+                                                                         (allcolumnssplit)
+                                                                         (alldestinationcolumns))
+                                   | otherwise -> transposedreorderedlist 
+                                                        
+                                                         
 
 {-------------------------}
 
@@ -662,91 +846,76 @@ filterFields opts xs = do --Grab just "FIELDS".
 {-Xlsx function and definitions.-}
 
 --createCellMap -> This function will
---create a CellMap using input from [String] and
+--create a CellMap using input from 
+--[(String,Int,Int,String)] and
 --cartesian coordinates for data-occupying cells.
-createCellMap :: [String] -> [(Int,Int)] -> [((Int,Int),Cell)]
+createCellMap :: [(String,Int,Int,String)] -> [(Int,Int)] -> [((Int,Int),Cell)]
 createCellMap []     []     = []
 createCellMap _      []     = []
 createCellMap []     _      = []
-createCellMap (x:xs) (y:ys) = --Header fields (":HEADER").
-                              if | ":HEADER" `DL.isSuffixOf` x || 
-                                   x == "Filtering_Status" ->
+createCellMap ((a,_,_,d):xs) (y:ys) = --Header fields (":HEADER").
+                              if | d == "HEADER" || 
+                                   a == "Filtering_Status" ->
                                    ([(y,Cell { _cellStyle = Just 1
-                                             , _cellValue = Just (CellText 
-                                                                 (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":HEADER$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                     )]) ++ (createCellMap xs ys)
                                  --Binary passing fields (":BINARYYES").
-                                 | ":BINARYYES" `DL.isSuffixOf` x || 
-                                   x == "Pass" ->
+                                 | d == "BINARYYES" || 
+                                   a == "Pass" ->
                                    ([(y,Cell { _cellStyle = Just 2
-                                             , _cellValue = Just (CellText 
-                                                                 (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":BINARYYES$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --Binary failing fields (":BINARYNO").
-                                 | ":BINARYNO" `DL.isSuffixOf` x || 
-                                   x == "Fail" ->
+                                 | d == "BINARYNO"|| 
+                                   a == "Fail" ->
                                    ([(y,Cell { _cellStyle = Just 4
-                                             , _cellValue = Just (CellText 
-                                                                 (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":BINARYNO$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --Trinary HEAD fields (":TRINARYHEAD").
-                                 | ":TRINARYHEAD" `DL.isSuffixOf` x ->
+                                 | d == "TRINARYHEAD" ->
                                    ([(y,Cell { _cellStyle = Just 7
-                                             , _cellValue = Just (CellText
-                                                                 (DText.pack
-                                                                 (TR.subRegex (TR.mkRegex ":TRINARYHEAD$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --Trinary MIDDLE fields (":TRINARYMIDDLE").
-                                 | ":TRINARYMIDDLE" `DL.isSuffixOf` x ->
+                                 | d == "TRINARYMIDDLE" ->
                                    ([(y,Cell { _cellStyle = Just 6
-                                             , _cellValue = Just (CellText
-                                                                 (DText.pack
-                                                                 (TR.subRegex (TR.mkRegex ":TRINARYMIDDLE$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --Trinary TAIL fields (":TRINARYTAIL").
-                                 | ":TRINARYTAIL" `DL.isSuffixOf` x ->
+                                 | d == "TRINARYTAIL" ->
                                    ([(y,Cell { _cellStyle = Just 5
-                                             , _cellValue = Just (CellText
-                                                                 (DText.pack
-                                                                 (TR.subRegex (TR.mkRegex ":TRINARYTAIL$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --NA fields (":NA").
-                                 | ":NA" `DL.isSuffixOf` x || x == "Not_filtered" ->
+                                 | d == "NA" || d == "Not_filtered" ->
                                    ([(y,Cell { _cellStyle = Just 3
-                                             , _cellValue = Just (CellText 
-                                                                 (DText.pack 
-                                                                 (TR.subRegex (TR.mkRegex ":NA$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing 
                                              }
                                    )]) ++ (createCellMap xs ys)
                                  --Filtering Binary fields (":FILTERCOLUMN").
-                                 | ":FILTERCOLUMN" `DL.isSuffixOf` x ->
+                                 | d == "FILTERCOLUMN" ->
                                    ([(y,Cell { _cellStyle = Just 1
-                                             , _cellValue = Just (CellText
-                                                                 (DText.pack
-                                                                 (TR.subRegex (TR.mkRegex ":FILTERCOLUMN$") x "")))
+                                             , _cellValue = Just (CellText (DText.pack a))
                                              , _cellComment = Nothing
                                              , _cellFormula = Nothing
                                              }
@@ -756,29 +925,19 @@ createCellMap (x:xs) (y:ys) = --Header fields (":HEADER").
 
 --createAndPrintXlsx -> This function will
 --create and print the xlsx file.
-createAndPrintXlsx :: [Flag] -> [[String]] -> IO ()
-createAndPrintXlsx [] [] = return ()
-createAndPrintXlsx [] _  = return ()
-createAndPrintXlsx _  [] = return ()
+createAndPrintXlsx :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
+createAndPrintXlsx [] []   = return ()
+createAndPrintXlsx [] _    = return ()
+createAndPrintXlsx _  []   = return ()
 createAndPrintXlsx opts xs = do
     --Grab just "OUTFILENAME".
     let outfilename = DL.head (DL.filter (isOutputFileName) opts)
     --Extract the string from OutputFileName.
     let outfilenamestring = extractOutputFileName outfilename
-    --Change commas to colons. 
-    let fixedxs = DL.map (DL.map (\x -> if (x =~ ",HEADER$" :: Bool) then (TR.subRegex (TR.mkRegex ",HEADER$") x ":HEADER")
-                                        else if (x =~ ",BINARYYES$" :: Bool) then (TR.subRegex (TR.mkRegex ",BINARYYES$") x ":BINARYYES")
-                                        else if (x =~ ",BINARYNO$" :: Bool) then (TR.subRegex (TR.mkRegex ",BINARYNO$") x ":BINARYNO")
-                                        else if (x =~ ",TRINARYHEAD$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYHEAD$") x ":TRINARYHEAD")
-                                        else if (x =~ ",TRINARYMIDDLE$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYMIDDLE$") x ":TRINARYMIDDLE")
-                                        else if (x =~ ",TRINARYTAIL$" :: Bool) then (TR.subRegex (TR.mkRegex ",TRINARYTAIL$") x ":TRINARYTAIL")
-                                        else if (x =~ ",NA$" :: Bool) then (TR.subRegex (TR.mkRegex ",NA$") x ":NA")
-                                        else if (x =~ ",FILTERCOLUMN$" :: Bool) then (TR.subRegex (TR.mkRegex ",FILTERCOLUMN$") x ":FILTERCOLUMN")
-                                        else x)) xs
-    --Calculate xy-coordinates (1-based) for fixedxs.
-    let cartcoor = DI.range ((1,1),(DL.length fixedxs,DL.length (DL.head fixedxs)))
+    --Calculate xy-coordinates (1-based) for xs.
+    let cartcoor = DI.range ((1,1),(DL.length xs,DL.length (DL.head xs)))
     --Create CellMap for fixedxs.
-    let finalcellmap = DMap.fromList (createCellMap (DL.concat fixedxs) cartcoor)
+    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor)
     --Add finalcellmap to filledworksheet.
     let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
                                        , _wsRowPropertiesMap = defaultrowpropertiesmap
@@ -834,13 +993,17 @@ createAndPrintXlsx opts xs = do
 --tempFileCreation -> This function will
 --print the file to stdout using
 --readProcess of the unix tool cat.
-catFile :: [[String]] -> IO ()
+catFile :: [[(String,Int,Int,String)]] -> IO ()
 catFile [] = return ()
 catFile xs = do
     --Open a temporary file.
     (tempfile,temph) <- SIOT.openTempFile "." "temp.txt"
+    --Turn xs into a list of strings.
+    let finalxs = DL.map ((DL.map (\x -> DL.intercalate "," x)))
+                         (DL.map (DL.map (\x -> listifyTwo x))
+                         (DL.map (DL.map (\(a,b,c,d) -> (a,d))) xs))
     --Intercalate a tab, and then a newline into xs.
-    let intercalatedxs = DL.intercalate "\n" (DL.map (DL.intercalate "\t") xs)
+    let intercalatedxs = DL.intercalate "\n" (DL.map (DL.intercalate "\t") finalxs)
     --Add intercalatedxs to temp.txt.
     SIO.hPutStrLn temph intercalatedxs
     --Close the temporary file's handle.
@@ -859,7 +1022,7 @@ catFile xs = do
 --print the file to either stdout
 --or to a output file based on
 --command-lines options provided.
-printFile :: [Flag] -> [[String]] -> IO ()
+printFile :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
 printFile []   [] = return ()
 printFile []   _  = return ()
 printFile _    [] = return ()
@@ -874,8 +1037,12 @@ printFile opts xs = do
                 let outfilename = DL.head (DL.filter (isOutputFileName) opts)
                 --Extract the string from OutputFileName.
                 let outfilenamestring = extractOutputFileName outfilename
+                --Turn xs into a list of strings.
+                let finalxs = DL.map ((DL.map (\x -> DL.intercalate "," x)))
+                                     (DL.map (DL.map (\x -> listifyTwo x))
+                                     (DL.map (DL.map (\(a,b,c,d) -> (a,d))) xs))
                 --mapNotLast tabs and newlines in xs.
-                let tabsandnewlinesadded = DL.intercalate "\n" (DL.map (DL.intercalate "\t") xs)
+                let tabsandnewlinesadded = DL.intercalate "\n" (DL.map (DL.intercalate "\t") finalxs)
                 --Write the output to the user-specified filename.
                 SIO.writeFile (outfilenamestring) $ (tabsandnewlinesadded) 
         else do --Create and print the xlsx file.
@@ -884,7 +1051,7 @@ printFile opts xs = do
 {---------------------}
 
 
-{-BVF Specific Function.-}
+{-FAT Specific Function.-}
 
 --processArgsAndFiles -> This function will
 --walk through each of the command-line

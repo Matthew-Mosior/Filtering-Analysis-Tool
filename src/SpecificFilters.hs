@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 2.0=-}
+{-=Version: 3.0=-}
 {-=Synopsis:  This Haskell Script will take in=-}
 {-=a tsv file and provide a in-depth view of=-}
 {-=the user-defined filtering schema provided.=-}
@@ -185,22 +185,22 @@ customNotDataFilter xs ys = smallCustomFilter (xs DL.!! 1) ys
 
 --equalityListCheckBinary -> This function will
 --serve to grab all elements for == filter.
-equalityListCheckBinary :: [String] -> [(String,Int,Int)] -> [[(String,String)]]
+equalityListCheckBinary :: [String] -> [(String,Int,Int)] -> [[(String,Int,Int,String)]]
 equalityListCheckBinary _ []  = []
 equalityListCheckBinary [] _  = []
 equalityListCheckBinary xs (y:ys) = [smallEqualityListCheckBinary xs y] ++ (equalityListCheckBinary xs ys)
     where
         --Nested function definitions.--
         --smallEqualityListCheckBinary
-        smallEqualityListCheckBinary :: [String] -> (String,Int,Int) -> [(String,String)]
+        smallEqualityListCheckBinary :: [String] -> (String,Int,Int) -> [(String,Int,Int,String)]
         smallEqualityListCheckBinary [] (_,_,_)  = []
         smallEqualityListCheckBinary _  ([],_,_) = []
         smallEqualityListCheckBinary xs y        = if (tripletFst y) /= "NA" ||
                                                       (tripletFst y) /= "N/A"
                                                        then if smallPredicateBinary xs [tripletFst y]
-                                                           then [(tripletFst y,"BINARYYES")]
-                                                           else [(tripletFst y,"BINARYNO")]
-                                                       else [(tripletFst y,"NA")]
+                                                           then [quadrupletTransform (y,"BINARYYES")]
+                                                           else [quadrupletTransform (y,"BINARYNO")]
+                                                       else [quadrupletTransform (y,"NA")]
         --smallPredicateBinary
         smallPredicateBinary :: [String] -> [String] -> Bool
         smallPredicateBinary [] _  = False
@@ -213,18 +213,17 @@ equalityListCheckBinary xs (y:ys) = [smallEqualityListCheckBinary xs y] ++ (equa
 
 --equalityListCheckTrinary -> This function will
 --serve to grab all elements for == filter.
-equalityListCheckTrinary :: [[String]] -> [(String,Int,Int)] -> [[(String,String)]]
+equalityListCheckTrinary :: [[String]] -> [(String,Int,Int)] -> [[(String,Int,Int,String)]]
 equalityListCheckTrinary _ []  = []
 equalityListCheckTrinary [] _  = []
-equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d)) 
-                                  (correctListOrdering
-                                   (DL.concat 
-                                   (DL.filter (not . DL.null) 
-                                    ([smallEqualityListCheckTrinaryHead (xs DL.!! 0) ys] 
-                                  ++ [smallEqualityListCheckTrinaryMiddle (xs DL.!! 1) ys] 
-                                  ++ [smallEqualityListCheckTrinaryTail (xs DL.!! 2) ys] 
-                                  ++ [smallEqualityListCheckTrinaryNA ys])))
-                                     (ys))]
+equalityListCheckTrinary xs ys = [(correctListOrdering
+                                  (DL.concat 
+                                  (DL.filter (not . DL.null) 
+                                  ([smallEqualityListCheckTrinaryHead (xs DL.!! 0) ys] 
+                                ++ [smallEqualityListCheckTrinaryMiddle (xs DL.!! 1) ys] 
+                                ++ [smallEqualityListCheckTrinaryTail (xs DL.!! 2) ys] 
+                                ++ [smallEqualityListCheckTrinaryNA ys])))
+                                   (ys))]
     where
         --Nested function definitions.--
         --smallEqualityListCheckTrinaryHead
@@ -372,7 +371,7 @@ equalityListCheckTrinary xs ys = [DL.map (\(a,b,c,d) -> (a,d))
 --specificFilters -> This function will
 --applied the prepared specific filtration
 --elucidated by filterFields.
-specificFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,String)]]
+specificFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]]
 specificFilters [] [] = []
 specificFilters [] _  = []
 specificFilters _  [] = []
@@ -397,196 +396,233 @@ specificFilters (x:xs) ys = do
          (DL.elem '+' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] 
+                                                               ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '/' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '+' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '/' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '+' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (+) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '/' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (/) (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '+' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (+) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '/' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (/) (DTuple.swap (mapTuple (read :: String -> Double) (tuplifyTwo (DLS.splitOneOf ";:," y))))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '-' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '-' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '-' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (-) (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '-' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if ((DTuple.uncurry (-) (DTuple.swap (mapTuple (read :: String -> Int) (tuplifyTwo (DLS.splitOneOf ";:," y))))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") &&
          (snd (tuplifyTwo (DLS.splitOn "," onex)) == "_") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf ">=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "_") &&
          (snd (tuplifyTwo (DLS.splitOn "," onex)) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
-                                           (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) >=
+                                                 (read (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "x") &&
          (snd (tuplifyTwo (DLS.splitOn "," onex)) == "_") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if (((read :: String -> Int) (fst (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isNotAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf "<=" threex) &&
          ((fst (tuplifyTwo (DLS.splitOn "," onex))) == "_") &&
          (snd (tuplifyTwo (DLS.splitOn "," onex)) == "y") ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          (DL.map (\(y,_,_) -> if ',' `DL.elem` y
-                                   then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
-                                           (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                   else (y,"NA")) onlydata))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          (DL.map (\allys@(y,_,_) -> if ',' `DL.elem` y
+                                         then if (((read :: String -> Int) (snd (tuplifyTwo (DLS.splitOneOf ";:," y)))) <=
+                                                 (read (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                             then quadrupletTransform (allys,"BINARYYES") 
+                                             else quadrupletTransform (allys,"BINARYNO")
+                                         else quadrupletTransform (allys,"NA")) onlydata))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf ">=" threex) ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          ((DL.map (\(y,_,_) -> if not (y =~ "NA" :: Bool) ||
-                                   not (y =~ "N/A" :: Bool)
-                                    then if (((read :: String -> Double) y) >=
-                                            ((read :: String -> Double) (TR.subRegex (TR.mkRegex "^>=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                    else (y,"NA")) onlydata)))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          ((DL.map (\allys@(y,_,_) -> if not (y =~ "NA" :: Bool) ||
+                                         not (y =~ "N/A" :: Bool)
+                                          then if (((read :: String -> Double) y) >=
+                                                  ((read :: String -> Double) (TR.subRegex (TR.mkRegex "^>=") threex ""))) 
+                                              then quadrupletTransform (allys,"BINARYYES") 
+                                              else quadrupletTransform (allys,"BINARYNO")
+                                          else quadrupletTransform (allys,"NA")) onlydata)))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf "<=" threex) ->
-         [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
-          ((DL.map (\(y,_,_) -> if not (y =~ "NA" :: Bool) ||
-                                   not (y =~ "N/A" :: Bool)
-                                    then if (((read :: String -> Double) y) <=
-                                            ((read :: String -> Double) (TR.subRegex (TR.mkRegex "^<=") threex ""))) then (y,"BINARYYES") else (y,"BINARYNO")
-                                    else (y,"NA")) onlydata)))] ++ (specificFilters xs ys)
+         [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+          ((DL.map (\allys@(y,_,_) -> if not (y =~ "NA" :: Bool) ||
+                                         not (y =~ "N/A" :: Bool)
+                                          then if (((read :: String -> Double) y) <=
+                                                  ((read :: String -> Double) (TR.subRegex (TR.mkRegex "^<=") threex ""))) 
+                                              then quadrupletTransform (allys,"BINARYYES")  
+                                              else quadrupletTransform (allys,"BINARYNO")
+                                          else quadrupletTransform (allys,"NA")) onlydata)))] ++ (specificFilters xs ys)
        | (zerox == "BINARY") &&
          (isAlphaList onex) &&
          (DL.elem '|' twox) &&
          (DL.isInfixOf "==" threex) ->
-           [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
+           [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
             (DL.concat (equalityListCheckBinary (DLS.splitOneOf "%" (TR.subRegex (TR.mkRegex "^==") threex "")) onlydata)))] 
          ++ (specificFilters xs ys)
        | (zerox == "TRINARY") &&
          (isAlphaList onex) &&
          (DL.elem '|' twox) ->
-           [((DL.map (\(x,_,_) -> (x,"HEADER")) notdata) ++
+           [((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
             (DL.concat (equalityListCheckTrinary (DL.map (DLS.splitOn "%") (DLS.splitOn "#" threex)) onlydata)))] 
          ++ (specificFilters xs ys)
        | otherwise -> specificFilters xs ys

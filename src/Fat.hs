@@ -1,7 +1,7 @@
 {-=Filtering-Analysis-Tool (FAT): A Haskell-based solution to=-}
 {-=analyze filtering schemes applied to tab delimited data.=-}
 {-=Author: Matthew Mosior=-}
-{-=Version: 3.0=-}
+{-=Version: 1.0=-}
 {-=Synopsis:  This Haskell Script will take in=-} 
 {-=a tab-delimited file and provide a in-depth view=-} 
 {-=of the user-defined filtering schema provided.=-}
@@ -55,10 +55,11 @@ import Text.Regex.TDFA as TRP
 
 data Flag 
     = Verbose                     -- -v
-    | Version                     -- -V -?
-    | OutputFileType       String -- -t
+    | Version                     -- -V -? 
     | OutputFileName       String -- -o 
     | OutputSheetName      String -- -s
+    | StyleSheetChoice     String --
+    | FullProtection              -- 
     | FilterFields         String -- -F
     | AddFilteringStatus          -- -S
     | AddFilteringBinaries        -- -B
@@ -77,12 +78,6 @@ data Flag
 
 {-Custom bool functions for Flag Datatype.-}
 
---isOutputFileType -> This function will
---test for the OutputFileType flag.
-isOutputFileType :: Flag -> Bool
-isOutputFileType (OutputFileType _) = True
-isOutputFileType _                  = False  
-
 --isOutputFileName -> This function will
 --test for OutputFileName flag.
 isOutputFileName :: Flag -> Bool
@@ -94,6 +89,12 @@ isOutputFileName _                  = False
 isOutputSheetName :: Flag -> Bool
 isOutputSheetName (OutputSheetName _) = True
 isOutputSheetName _                   = False
+
+--isStyleSheetChoice -> This function will
+--test for OutputSheetName flag.
+isStyleSheetChoice :: Flag -> Bool
+isStyleSheetChoice (StyleSheetChoice _) = True
+isStyleSheetChoice _                    = False
 
 --isFilterFields -> This function will
 --test for FilterFields flag.
@@ -148,12 +149,6 @@ isNAColor _           = False
 
 {-Custom extraction functions for Flag Datatype.-}
 
---extractOutputFileType -> This function will
---extract the string associated with
---OutputFileType.
-extractOutputFileType :: Flag -> String
-extractOutputFileType (OutputFileType x) = x
-
 --extractOutputFileName -> This function will
 --extract the string associated with 
 --OutputFileName.
@@ -165,6 +160,12 @@ extractOutputFileName (OutputFileName x) = x
 --OutputSheetName.
 extractOutputSheetName :: Flag -> String
 extractOutputSheetName (OutputSheetName x) = x
+
+--extractStyleSheetChoice -> This function will
+--extract the string associated with
+--StyleSheetChoice.
+extractStyleSheetChoice :: Flag -> String
+extractStyleSheetChoice (StyleSheetChoice x) = x
 
 --extractFilterFields -> This function will
 --extract the string associated with 
@@ -223,12 +224,13 @@ extractNAColor (NAColor x) = x
 --describe flags.
 options :: [OptDescr Flag]
 options =
-    [ Option ['v']     ["verbose"]              (NoArg Verbose)                                      "Output on stderr.",
-      Option ['V','?'] ["version"]              (NoArg Version)                                      "Show version number.",
-      Option ['t']     ["outputfiletype"]       (ReqArg OutputFileType "OUTFILETYPE")                "The output file type (tsv or xlsx).",
-      Option ['o']     ["outputfilename"]       (ReqArg OutputFileName "OUTFILENAME")                "The output file name.",
-      Option ['s']     ["outputsheetname"]      (ReqArg OutputSheetName "OUTSHEETNAME")              "The string to be used as the xlsx sheet name.",
-      Option ['F']     ["filterfields"]         (ReqArg FilterFields "FIELDS")                       "The fields to filter on.",
+    [ Option ['v']     ["verbose"]              (NoArg Verbose)                                      "Output on stderr.\n",
+      Option ['V','?'] ["version"]              (NoArg Version)                                      "Show version number.\n",
+      Option ['o']     ["outputfilename"]       (ReqArg OutputFileName "OUTFILENAME")                "The output file name.\n",
+      Option ['s']     ["outputsheetname"]      (ReqArg OutputSheetName "OUTSHEETNAME")              "The string to be used as the xlsx sheet name.\n",
+      Option []        ["stylesheet"]           (ReqArg StyleSheetChoice "STYLESHEET")               "The stylesheet to be used.\n",
+      Option []        ["fullprotection"]       (NoArg FullProtection)                               "Protect the workbook.\n",
+      Option ['F']     ["filterfields"]         (ReqArg FilterFields "FIELDS")                       "The fields to filter on.\n",
       Option ['S']     ["addfilteringstatus"]   (NoArg AddFilteringStatus)                           "Add column to end of file describing\n\
                                                                                                      \the filtering status of each row.\n",
       Option ['B']     ["addfilteringbinaries"] (NoArg AddFilteringBinaries)                         "Add a column for each BINARY filter applied\n\
@@ -268,6 +270,13 @@ compilerOpts argv =
                | DL.elem Version args ->
                do SIO.hPutStrLn stderr (greeting ++ version ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith SX.ExitSuccess
+               | DL.length (DL.filter (isStyleSheetChoice) args) < 1 ->
+               do SIO.hPutStrLn stderr (sscmiss ++ github ++ "\n" ++ SCG.usageInfo header options)
+                  SX.exitWith (SX.ExitFailure 1)
+               | DL.length (DL.filter (isStyleSheetChoice) args) > 0 &&
+                 (not (checkStyleSheetChoice (extractStyleSheetChoice (DL.head (DL.filter (isStyleSheetChoice) args))))) ->
+               do SIO.hPutStrLn stderr (sscerror ++ github ++ SCG.usageInfo header options)
+                  SX.exitWith (SX.ExitFailure 1)
                | DL.length file > 1 ->
                do SIO.hPutStrLn stderr (flerror ++ github ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
@@ -278,26 +287,14 @@ compilerOpts argv =
                  (not (filterFieldsCheck (extractFilterFields (DL.head (DL.filter (isFilterFields) args))))) ->
                do SIO.hPutStrLn stderr (fferror ++ github ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isOutputFileType) args) > 0) && 
-                 (DL.length (DL.filter (isOutputFileName) args) < 1) ->
+               | (DL.length (DL.filter (isOutputFileName) args) < 1) ->
                do SIO.hPutStrLn stderr (outfilenamemiss ++ suffpossible ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isOutputFileName) args) > 0) &&
-                 (DL.length (DL.filter (isOutputFileType) args) < 1) ->
-               do SIO.hPutStrLn stderr (outtypemiss ++ outtypepossible ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1) 
-               | (DL.length (DL.filter (isOutputFileType) args) > 0) &&
-                 (DL.length (DL.filter (isOutputFileName) args) > 0) &&
-                 (not (checkOutputFileTypeAndOutputFileNameFormat 
-                 (extractOutputFileType 
-                 (DL.head (DL.filter (isOutputFileType) args))) 
+                 (not (checkOutputFileName
                  (extractOutputFileName (DL.head (DL.filter (isOutputFileName) 
                  args))))) ->
-               do SIO.hPutStrLn stderr (outtypesuffmm ++ outtypepossible ++ suffpossible ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | extractOutputFileType (DL.head (DL.filter (isOutputFileType) args)) == "tsv" &&
-                 (DL.length (DL.filter (isOutputSheetName) args) > 0) ->
-               do SIO.hPutStrLn stderr (outsheetnamemm ++ "\n" ++ SCG.usageInfo header options)
+               do SIO.hPutStrLn stderr (sufferror ++ suffpossible ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isOutputSheetName) args) > 0) &&
                  (not (checkOutputSheetName (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
@@ -325,30 +322,22 @@ compilerOpts argv =
             SX.exitWith (SX.ExitFailure 1)
         where 
             greeting         = "Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.\n"
-            header           = "Usage: Fat [-vV?tosFSBcpfhmln] [tsv]\n"
+            header           = "Usage: Fat [-vV?osFSBcpfhmln] [tsv]\n"
             version          = "Filtering Analysis Tool (FAT), Version 1.0.\n"
-            github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n" 
+            github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n"
+            sscmiss          = "StyleSheet argument missing.\nPlease provide a StyleSheet:\ndefault\nvaccine\n"
+            sscerror         = "Please provide one of following StyleSheet choices:\ndefault\nvaccine\n" 
             flerror          = "Incorrect number of input files:  Please provide one input file.\n"
             fferror          = "Incorrect structure of the filtration string (;?:~~;).\n"
             ffmiss           = "Filtration string missing.\nPlease define a \ 
                                \filtration string using the -F (--filterfields) argument.\n"
-            outtypes         = "Possible output file formats are tsv and xlsx.\n"
-            outtypeferror    = "Output file format not recognized.\n"
-            outtypemiss      = "Output file type missing.\nPlease provide an output file format.\n"
-            outfilenamemiss  = "Output file name missing.\nPlease provide an output file name.\n"
-            outsheetnamemm   = "Xlsx sheet name not applicable for tsv output file.\n\
-                               \If outputting tsv, do not provide out -s (--outputsheetname) argument.\n"
+            outfilenamemiss  = "Output file name missing.\nPlease provide an output file name.\n" 
             outsheeterror    = "Please provide xlsx accepted characters for sheet names (\\/*?:[].)\n\
                                \less than 32 characters long to the -s (--outputsheetname) argument.\n"
             hexferror        = "Incorrect hex format.\n"
             hexf             = "ASCII hexadecimal digits: '0'..'9', 'a'..'f', 'A'..'F'.\n"
             sufferror        = "File extension not allowed.\n"
-            suffpossible     = "Allowed file extensions are:\n.tsv\n.xlsx\n"
-            outtypepossible  = "Allowed output file formats are:\ntsv\nxlsx\n"
-            outtypesuffmm    = "Output file format and output file extension are mismatched.\n\
-                               \Please ensure output file type and output file extension are the same:\n\
-                               \tsv  <-> .tsv\n\
-                               \xlsx <-> .xlsx\n"
+            suffpossible     = "Allowed file extensions are:\n.xlsx\n" 
 
 {----------------------------------------}
 
@@ -476,21 +465,28 @@ strongEq x y = DL.null (x DL.\\ y) && DL.null (y DL.\\ x)
 
 {----------------------------}
 
+{-StyleSheetChoice function.-}
 
-{-OutputFileType and OutputFileName function.-}
+checkStyleSheetChoice :: String -> Bool
+checkStyleSheetChoice [] = False
+checkStyleSheetChoice xs = if xs == "default" ||
+                              xs == "vaccine"
+                               then True
+                               else False
 
---checkOutputFileTypeAndOutputFileNameFormat -> This function will
+{----------------------------}
+
+
+{-OutputFileName function.-}
+
+--checkOutputFileName -> This function will
 --check the format of 
---the OutputFileType and 
---OutputFileName string.
-checkOutputFileTypeAndOutputFileNameFormat :: String -> String -> Bool
-checkOutputFileTypeAndOutputFileNameFormat [] [] = False
-checkOutputFileTypeAndOutputFileNameFormat [] _  = False
-checkOutputFileTypeAndOutputFileNameFormat _  [] = False
-checkOutputFileTypeAndOutputFileNameFormat xs ys = if (xs == "tsv" && (ys =~ ("\\.tsv$" :: String) :: Bool)) ||
-                                                      (xs == "xlsx" && (ys =~ ("\\.xlsx$" :: String) :: Bool))
-                                                       then True
-                                                       else False
+--the OutputFileName string.
+checkOutputFileName :: String -> Bool
+checkOutputFileName [] = False
+checkOutputFileName xs = if (xs =~ ("\\.xlsx$" :: String) :: Bool)
+                                              then True
+                                              else False
 
 {---------------------------}
 
@@ -849,78 +845,157 @@ filterFields opts xs = do --Grab just "FIELDS".
 --create a CellMap using input from 
 --[(String,Int,Int,String)] and
 --cartesian coordinates for data-occupying cells.
-createCellMap :: [(String,Int,Int,String)] -> [(Int,Int)] -> [((Int,Int),Cell)]
-createCellMap []     []     = []
-createCellMap _      []     = []
-createCellMap []     _      = []
-createCellMap ((a,_,_,d):xs) (y:ys) = --Header fields (":HEADER").
-                              if | d == "HEADER" || 
-                                   a == "Filtering_Status" ->
-                                   ([(y,Cell { _cellStyle = Just 1
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing 
-                                             }
-                                    )]) ++ (createCellMap xs ys)
-                                 --Binary passing fields (":BINARYYES").
-                                 | d == "BINARYYES" || 
-                                   a == "Pass" ->
-                                   ([(y,Cell { _cellStyle = Just 2
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing 
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --Binary failing fields (":BINARYNO").
-                                 | d == "BINARYNO"|| 
-                                   a == "Fail" ->
-                                   ([(y,Cell { _cellStyle = Just 4
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing 
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --Trinary HEAD fields (":TRINARYHEAD").
-                                 | d == "TRINARYHEAD" ->
-                                   ([(y,Cell { _cellStyle = Just 7
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --Trinary MIDDLE fields (":TRINARYMIDDLE").
-                                 | d == "TRINARYMIDDLE" ->
-                                   ([(y,Cell { _cellStyle = Just 6
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --Trinary TAIL fields (":TRINARYTAIL").
-                                 | d == "TRINARYTAIL" ->
-                                   ([(y,Cell { _cellStyle = Just 5
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --NA fields (":NA").
-                                 | d == "NA" || d == "Not_filtered" ->
-                                   ([(y,Cell { _cellStyle = Just 3
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing 
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 --Filtering Binary fields (":FILTERCOLUMN").
-                                 | d == "FILTERCOLUMN" ->
-                                   ([(y,Cell { _cellStyle = Just 1
-                                             , _cellValue = Just (CellText (DText.pack a))
-                                             , _cellComment = Nothing
-                                             , _cellFormula = Nothing
-                                             }
-                                   )]) ++ (createCellMap xs ys)
-                                 | otherwise -> createCellMap xs ys
+createCellMap :: [(String,Int,Int,String)] -> [(Int,Int)] -> [Flag] -> [((Int,Int),Cell)]
+createCellMap []               []     []    = []
+createCellMap []               []     (_:_) = []
+createCellMap []               (_:_)  _     = []
+createCellMap ((_, _, _, _):_) []     _     = []
+createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
+                                                 let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                                                 --Extract the string from OutputFileName.
+                                                 let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                                                 --If user defined "default" for StyleSheetChoice.
+                                                 if | stylesheetchoicestring == "default" ->
+                                                    --Header fields (":HEADER").
+                                                    if | d == "HEADER" || 
+                                                         a == "Filtering_Status" ->
+                                                         ([(y,Cell { _cellStyle = Just 1
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing 
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Binary passing fields (":BINARYYES").
+                                                       | d == "BINARYYES" || 
+                                                         a == "Pass" ->
+                                                         ([(y,Cell { _cellStyle = Just 2
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing 
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Binary failing fields (":BINARYNO").
+                                                       | d == "BINARYNO"|| 
+                                                         a == "Fail" ->
+                                                         ([(y,Cell { _cellStyle = Just 4
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing 
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary HEAD fields (":TRINARYHEAD").
+                                                       | d == "TRINARYHEAD" ->
+                                                         ([(y,Cell { _cellStyle = Just 7
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary MIDDLE fields (":TRINARYMIDDLE").
+                                                       | d == "TRINARYMIDDLE" ->
+                                                         ([(y,Cell { _cellStyle = Just 6
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary TAIL fields (":TRINARYTAIL").
+                                                       | d == "TRINARYTAIL" ->
+                                                         ([(y,Cell { _cellStyle = Just 5
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --NA fields (":NA").
+                                                       | d == "NA" || 
+                                                         a == "Not_filtered" ->
+                                                         ([(y,Cell { _cellStyle = Just 3
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing 
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Filtering Binary fields (":FILTERCOLUMN").
+                                                       | d == "FILTERCOLUMN" ->
+                                                         ([(y,Cell { _cellStyle = Just 1
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       | otherwise -> createCellMap xs ys opts
+                                                    | otherwise ->
+                                                    --Header fields (":HEADER").
+                                                    if | d == "HEADER" ||
+                                                         a == "Filtering_Status" ->
+                                                         ([(y,Cell { _cellStyle = Just 2
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Binary passing fields (":BINARYYES").
+                                                       | d == "BINARYYES" ||
+                                                         a == "Pass" ->
+                                                         ([(y,Cell { _cellStyle = Just 4
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Binary failing fields (":BINARYNO").
+                                                       | d == "BINARYNO"||
+                                                         a == "Fail" ->
+                                                         ([(y,Cell { _cellStyle = Just 6
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary HEAD fields (":TRINARYHEAD").
+                                                       | d == "TRINARYHEAD" ->
+                                                         ([(y,Cell { _cellStyle = Just 9
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary MIDDLE fields (":TRINARYMIDDLE").
+                                                       | d == "TRINARYMIDDLE" ->
+                                                         ([(y,Cell { _cellStyle = Just 8
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Trinary TAIL fields (":TRINARYTAIL").
+                                                       | d == "TRINARYTAIL" ->
+                                                         ([(y,Cell { _cellStyle = Just 7
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --NA fields (":NA").
+                                                       | d == "NA" ||
+                                                         a == "Not_filtered" ->
+                                                         ([(y,Cell { _cellStyle = Just 5
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                   }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       --Filtering Binary fields (":FILTERCOLUMN").
+                                                       | d == "FILTERCOLUMN" ->
+                                                         ([(y,Cell { _cellStyle = Just 3
+                                                                   , _cellValue = Just (CellText (DText.pack a))
+                                                                   , _cellComment = Nothing
+                                                                   , _cellFormula = Nothing
+                                                                }
+                                                         )]) ++ (createCellMap xs ys opts)
+                                                       | otherwise -> createCellMap xs ys opts 
+                                               
         ----------------------
 
 --createAndPrintXlsx -> This function will
@@ -937,86 +1012,182 @@ createAndPrintXlsx opts xs = do
     --Calculate xy-coordinates (1-based) for xs.
     let cartcoor = DI.range ((1,1),(DL.length xs,DL.length (DL.head xs)))
     --Create CellMap for fixedxs.
-    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor)
+    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts)
     --Add finalcellmap to filledworksheet.
-    let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
-                                       , _wsRowPropertiesMap = defaultrowpropertiesmap
-                                       , _wsCells = finalcellmap
-                                       , _wsDrawing = defaultwsdrawing
-                                       , _wsMerges = defaultwsmerges
-                                       , _wsSheetViews = defaultwssheetviews
-                                       , _wsPageSetup = defaultwspagesetup
-                                       , _wsConditionalFormattings = defaultwsconditionalformattings
-                                       , _wsDataValidations = defaultwsdatavalidations
-                                       , _wsPivotTables = defaultwspivottables
-                                       , _wsAutoFilter = defaultwsautofilter
-                                       , _wsTables = defaultwstables
-                                       , _wsProtection = defaultwsprotection
-                                       , _wsSharedFormulas = defaultwssharedformulas 
-                                       }
-    --Check for OutputSheetName flag.
-    if DL.length (DL.filter (isOutputSheetName) opts) > 0
-        then do --Grab just "OUTFILENAME".
+    --Check for FullProtection flag.
+    if | DL.elem FullProtection opts -> 
+       do --Use fullwsprotection as defined in FatDefinitions.hs.
+          let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
+                                             , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                             , _wsCells = finalcellmap
+                                             , _wsDrawing = defaultwsdrawing
+                                             , _wsMerges = defaultwsmerges
+                                             , _wsSheetViews = defaultwssheetviews
+                                             , _wsPageSetup = defaultwspagesetup
+                                             , _wsConditionalFormattings = defaultwsconditionalformattings
+                                             , _wsDataValidations = defaultwsdatavalidations
+                                             , _wsPivotTables = defaultwspivottables
+                                             , _wsAutoFilter = defaultwsautofilter
+                                             , _wsTables = defaultwstables
+                                             , _wsProtection = fullwsprotection 
+                                             , _wsSharedFormulas = defaultwssharedformulas 
+                                             }
+          --Check for OutputSheetName flag.
+          if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+             do --Grab just "OUTFILENAME".
                 let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
                 --Extract the string from OutputFileName.
                 let outsheetnamestring = extractOutputSheetName outsheetname
-                --Add filledworksheet to filledxlsx.
-                let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                         , _xlStyles = renderStyleSheet defaultstylesheet
-                                         , _xlDefinedNames = defaultxldefinednames
-                                         , _xlCustomProperties = defaultxlcustomproperties
-                                         , _xlDateBase = defaultxldatebase
-                                         }
-                --Grab time.
-                currenttime <- DTCP.getPOSIXTime
-                --Print out filledxlsx file.
-                DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-        else do --Set xlsxsheetname.
+                --Grab just "STYLESHEETCHOICE".
+                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise -> 
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+             | otherwise ->
+             do --Set xlsxsheetname.
                 let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                --Add filledworksheet to filledxlsx.
-                let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                         , _xlStyles = renderStyleSheet defaultstylesheet
-                                         , _xlDefinedNames = defaultxldefinednames
-                                         , _xlCustomProperties = defaultxlcustomproperties
-                                         , _xlDateBase = defaultxldatebase 
-                                         }
-                --Grab time.
-                currenttime <- DTCP.getPOSIXTime
-                --Print out filledxlsx file.
-                DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                --Grab just "STYLESHEETCHOICE".
+                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise -> 
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+       | otherwise -> 
+       do --Use defaultwsprotection as defined in FatDefinitions.hs.
+          let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
+                                             , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                             , _wsCells = finalcellmap
+                                             , _wsDrawing = defaultwsdrawing
+                                             , _wsMerges = defaultwsmerges
+                                             , _wsSheetViews = defaultwssheetviews
+                                             , _wsPageSetup = defaultwspagesetup
+                                             , _wsConditionalFormattings = defaultwsconditionalformattings
+                                             , _wsDataValidations = defaultwsdatavalidations
+                                             , _wsPivotTables = defaultwspivottables
+                                             , _wsAutoFilter = defaultwsautofilter
+                                             , _wsTables = defaultwstables
+                                             , _wsProtection = defaultwsprotection
+                                             , _wsSharedFormulas = defaultwssharedformulas
+                                             }
+          --Check for OutputSheetName flag.
+          if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+             do --Grab just "OUTFILENAME".
+                let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                --Extract the string from OutputFileName.
+                let outsheetnamestring = extractOutputSheetName outsheetname
+                --Grab just "STYLESHEETCHOICE".
+                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise -> 
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+              | otherwise ->
+              do --Set xlsxsheetname.
+                let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
+                --Grab just "STYLESHEETCHOICE".
+                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
 
 {-----------------}
 
 
 {-Printing functions.-}
-
---tempFileCreation -> This function will
---print the file to stdout using
---readProcess of the unix tool cat.
-catFile :: [[(String,Int,Int,String)]] -> IO ()
-catFile [] = return ()
-catFile xs = do
-    --Open a temporary file.
-    (tempfile,temph) <- SIOT.openTempFile "." "temp.txt"
-    --Turn xs into a list of strings.
-    let finalxs = DL.map ((DL.map (\x -> DL.intercalate "," x)))
-                         (DL.map (DL.map (\x -> listifyTwo x))
-                         (DL.map (DL.map (\(a,b,c,d) -> (a,d))) xs))
-    --Intercalate a tab, and then a newline into xs.
-    let intercalatedxs = DL.intercalate "\n" (DL.map (DL.intercalate "\t") finalxs)
-    --Add intercalatedxs to temp.txt.
-    SIO.hPutStrLn temph intercalatedxs
-    --Close the temporary file's handle.
-    SIO.hClose temph
-    --Print out the contents of tempfile to the screen using cat unix tool.
-    (_,_,_,ph) <- SP.createProcess (SP.proc "cat" [tempfile])
-    ec <- SP.waitForProcess ph
-    case ec of
-        SX.ExitSuccess   -> do _ <- SP.readProcess "rm" [tempfile] []
-                               return ()
-        SX.ExitFailure _ -> do _ <- error "Could not cat file."
-                               _ <- SP.readProcess "rm" [tempfile] []
-                               return ()
 
 --printFile -> This function will
 --print the file to either stdout
@@ -1026,27 +1197,8 @@ printFile :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
 printFile []   [] = return ()
 printFile []   _  = return ()
 printFile _    [] = return ()
-printFile opts xs = do
-    --Grab just "OUTFILETYPE".
-    let outfiletype = DL.head (DL.filter (isOutputFileType) opts)
-    --Extract the string from OutputFileType.
-    let outfiletypestring = extractOutputFileType outfiletype 
-    --Check to see if user provided tsv or xlsx file. 
-    if outfiletypestring == "tsv"
-        then do --Grab just "OUTFILENAME".
-                let outfilename = DL.head (DL.filter (isOutputFileName) opts)
-                --Extract the string from OutputFileName.
-                let outfilenamestring = extractOutputFileName outfilename
-                --Turn xs into a list of strings.
-                let finalxs = DL.map ((DL.map (\x -> DL.intercalate "," x)))
-                                     (DL.map (DL.map (\x -> listifyTwo x))
-                                     (DL.map (DL.map (\(a,b,c,d) -> (a,d))) xs))
-                --mapNotLast tabs and newlines in xs.
-                let tabsandnewlinesadded = DL.intercalate "\n" (DL.map (DL.intercalate "\t") finalxs)
-                --Write the output to the user-specified filename.
-                SIO.writeFile (outfilenamestring) $ (tabsandnewlinesadded) 
-        else do --Create and print the xlsx file.
-                createAndPrintXlsx opts xs
+printFile opts xs = --Create and print the xlsx file.
+                    createAndPrintXlsx opts xs
 
 {---------------------}
 
@@ -1065,10 +1217,8 @@ processArgsAndFiles (options,inputfile) = do
     let processedfile = lineFeed readinputfile 
     --Filter the file based on the filter fields header. 
     let filteredfile = filterFields options processedfile 
-    --Print the file to stdout (cat) or to a file.
-    if DL.length (DL.filter (isOutputFileType) options) > 0 
-        then printFile options filteredfile
-        else catFile filteredfile
+    --Print the xlsx file.
+    printFile options filteredfile
 
 --processArgsAndContents -> This function will
 --walk through each of the command-line
@@ -1080,10 +1230,8 @@ processArgsAndContents (options,content) = do
     let processedfile = lineFeed content
     --Filter the file based on the filter fields header.
     let filteredfile = filterFields options processedfile
-    --Print the file to stdout (cat) or to a file.
-    if DL.length (DL.filter (isOutputFileType) options) > 0
-        then printFile options filteredfile
-        else catFile filteredfile
+    --Print the xlsx file.
+    printFile options filteredfile
 
 {-------------------------}
 

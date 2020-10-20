@@ -14,10 +14,11 @@
 {----------------------}
 
 
-{-Import module.-}
+{-Import modules.-}
 
-import SpecificFilters
+import Common
 import FatDefinitions
+import FilterFields
 
 {----------------}
 
@@ -48,32 +49,7 @@ import Text.Read as TRead
 import Text.Regex as TR
 import Text.Regex.TDFA as TRP
 
-{---------} 
-
-
-{-Custom CML Option Datatype.-}
-
-data Flag 
-    = Verbose                     -- -v
-    | Version                     -- -V -? 
-    | OutputFileName       String -- -o 
-    | OutputSheetName      String -- -s
-    | StyleSheetChoice     String --
-    | FullProtection              -- 
-    | FilterFields         String -- -F
-    | AddFilteringStatus          -- -S
-    | AddFilteringBinaries        -- -B
-    | CopyColumnFormatting String -- -c
-    | BinaryPassingColor   String -- -p (Default: #FFFF0000)
-    | BinaryFailingColor   String -- -f (Default: #FF00FF00)
-    | TrinaryHeadColor     String -- -h (Default: #FFFF0000)
-    | TrinaryMiddleColor   String -- -m (Default: #FFFFFF33)
-    | TrinaryTailColor     String -- -l (Default: #FF00FF00)
-    | NAColor              String -- -n (Default: #FFC0C0C0)
-    | Help                        -- --help
-    deriving (Eq,Ord,Show) 
-
-{-----------------------------}
+{---------}
 
 
 {-Custom bool functions for Flag Datatype.-}
@@ -107,6 +83,12 @@ isFilterFields _                = False
 isCopyColumnFormatting :: Flag -> Bool
 isCopyColumnFormatting (CopyColumnFormatting _) = True
 isCopyColumnFormatting _                        = False
+
+--isHideColumns -> This function will
+--test for HideColumn flag.
+isHideColumns :: Flag -> Bool
+isHideColumns (HideColumns _) = True
+isHideColumns _               = False
 
 --isBinaryPassingColor -> This function will
 --test for the BinaryPassingColor Flag.
@@ -179,6 +161,12 @@ extractFilterFields (FilterFields x) = x
 extractCopyColumnFormatting :: Flag -> String
 extractCopyColumnFormatting (CopyColumnFormatting x) = x
 
+--extractHideColumns -> This function will
+--extract the string associated with
+--HideColumns.
+extractHideColumns :: Flag -> String
+extractHideColumns (HideColumns x) = x
+
 --extractBinaryPassingColor -> This function will
 --extract the string associated with
 --BinaryPassingColor.
@@ -238,6 +226,8 @@ options =
                                                                                                      \failed (0) that filter.\n",
       Option ['c']     ["copycolumnformatting"] (ReqArg CopyColumnFormatting "COPYCOLUMNFORMATTING") "Copy column formatting of one column to\n\
                                                                                                      \to another column (row-wise).\n",
+      Option ['H']     ["hidecolumns"]          (ReqArg HideColumns "HIDECOLUMNS")                   "Columns to hide from view within an excel\n\
+                                                                                                     \worksheet.\n",
       Option ['p']     ["binarypassingcolor"]   (ReqArg BinaryPassingColor "BINARYPASSCOLOR")        "The ARGB hex value to use to fill passing cells with.\n\
                                                                                                      \Default value: #FFFF0000\n",
       Option ['f']     ["binaryfailingcolor"]   (ReqArg BinaryFailingColor "BINARYFAILCOLOR")        "The ARGB hex value to use to fill failing cells with.\n\
@@ -280,11 +270,11 @@ compilerOpts argv =
                | DL.length file > 1 ->
                do SIO.hPutStrLn stderr (flerror ++ github ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
-               | DL.length (DL.filter (isFilterFields) args) < 1 ->
+               | DL.length (DL.filter (Main.isFilterFields) args) < 1 ->
                do SIO.hPutStrLn stderr (ffmiss ++ github ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isFilterFields) args) > 0) && 
-                 (not (filterFieldsCheck (extractFilterFields (DL.head (DL.filter (isFilterFields) args))))) ->
+               | (DL.length (DL.filter (Main.isFilterFields) args) > 0) && 
+                 (not (filterFieldsCheck (Main.extractFilterFields (DL.head (DL.filter (Main.isFilterFields) args))))) ->
                do SIO.hPutStrLn stderr (fferror ++ github ++ "\n" ++ SCG.usageInfo header options)
                   SX.exitWith (SX.ExitFailure 1)
                | (DL.length (DL.filter (isOutputFileName) args) < 1) ->
@@ -322,7 +312,7 @@ compilerOpts argv =
             SX.exitWith (SX.ExitFailure 1)
         where 
             greeting         = "Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.\n"
-            header           = "Usage: Fat [-vV?osFSBcpfhmln] [tsv]\n"
+            header           = "Usage: Fat [-vV?osFSBcHpfhmln] [tsv]\n"
             version          = "Filtering Analysis Tool (FAT), Version 1.0.\n"
             github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n"
             sscmiss          = "StyleSheet argument missing.\nPlease provide a StyleSheet:\ndefault\nvaccine\n"
@@ -341,129 +331,6 @@ compilerOpts argv =
 
 {----------------------------------------}
 
-
-{-General Utility Functions.-}
-
---isSubsetOf -> This function will
---be used in the stripHeader function.
-xs `isSubsetOf` ys = DL.any (`DL.elem` ys) xs
-
---lineFeed -> This function will
---read the file in and split on
---whitespace, returning a list
---of lists.
-lineFeed :: String -> [[String]]
-lineFeed [] = []
-lineFeed xs = DL.map DL.words (DL.lines xs)
-
---isHexList -> This function will
---test a string for only hex
---characters.
-isHexList :: String -> Bool
-isHexList xs = DL.all DC.isHexDigit xs && 
-               (DL.head xs) == '#'
-
---isAlphaList -> This function will
---test a string for only alphabetic
---characters.
-isAlphaList :: String -> Bool
-isAlphaList xs = DL.all DC.isAlpha xs
-
---isNotAlphaList -> This function will
---test a String for non-alphabetic
---characters.
-isNotAlphaList :: String -> Bool
-isNotAlphaList xs = not (DL.all DC.isAlpha xs) 
-
---mapNotLast -> This function will
---work like the traditional map 
---function in Data.List, but not
---map to the last element of a list.
-mapNotLast :: (a -> a) -> [a] -> [a]
-mapNotLast fn []     = []
-mapNotLast fn [x]    = [x]
-mapNotLast fn (x:xs) = fn x : mapNotLast fn xs
-
---mapTuple -> This function will
---map a function across all elements
---of a two-tuple.
-mapTuple :: (b'->c') -> (b',b') -> (c',c')
-mapTuple = CM.join (***)
-
---matchedReplication -> This function will
---take in two lists, and replicate items in 
---one list as long as the other list.
-matchedReplication :: [[String]] -> [Int] -> [[Int]]
-matchedReplication [] []         = []
-matchedReplication _  []         = []
-matchedReplication [] _          = []
-matchedReplication (x:xs) (y:ys) = [DL.replicate (DL.length x) y] ++ (matchedReplication xs ys)
-
---nestedCycle -> This function will
---repeat a list of numbers the length
---of another list.
-nestedCycle :: [[String]] -> [Int] -> [[Int]]
-nestedCycle [] []     = []
-nestedCycle _ []      = []
-nestedCycle [] _      = []
-nestedCycle (x:xs) ys = [DL.take (DL.length x) ys] ++ (nestedCycle xs ys)
-
---orderList -> This function will
---order a nested list.
-orderList :: [[String]] -> [[Int]] -> [[Int]] -> [[(String,Int,Int)]]
-orderList [] [] []             = []
-orderList [] [] _              = []
-orderList [] _  []             = []
-orderList _  [] []             = []
-orderList _  _  []             = []
-orderList [] _  _              = [] 
-orderList _  [] _              = []
-orderList (x:xs) (y:ys) (z:zs) = [DL.zip3 x y z] ++ (orderList xs ys zs)
-
---tripletFst -> This function will
---act as a fst but for a triplet.
-tripletFst :: (String,Int,Int) -> String
-tripletFst (x,y,z) = x
-
---tripletSnd -> This function will
---act as a snd but for a triplet.
-tripletSnd :: (String,Int,Int) -> Int
-tripletSnd (x,y,z) = y
-
---tripletFst -> This function will
---act to grab the third element of a triplet.
-tripletThrd :: (String,Int,Int) -> Int
-tripletThrd (x,y,z) = z
-
---tuplifyTwo -> This function will
---turn a list of two elements into
---a two-tuple.
-tuplifyTwo :: [a] -> (a,a)
-tuplifyTwo [x,y]     = (x,y)
-
---listifyTwo -> This function will
---turn a tuple into a list of 
---two elements.
-listifyTwo :: (a,a) -> [a]
-listifyTwo (x,y) = [x,y]
-
---singleunnest -> This function will
---unnest a list.
-singleunnest :: [a] -> a
-singleunnest [a] = a
-
---smallSort -> This function will
---perform sorting on lists of triplets.
-smallSort :: [[(String,Int,Int)]] -> [[(String,Int,Int)]]
-smallSort [] = []
-smallSort (x:xs) = [DL.sortBy (\(_,_,a) (_,_,b) -> compare a b) x] ++ (smallSort xs)
-
---strongEq -> This function will
---serve as a stronger version of ==.
-strongEq :: (Eq a) => [a] -> [a] -> Bool
-strongEq x y = DL.null (x DL.\\ y) && DL.null (y DL.\\ x)
-
-{----------------------------}
 
 {-StyleSheetChoice function.-}
 
@@ -525,317 +392,7 @@ filterFieldsCheck xs = if (DL.elem flaglength ffdelimiterlengths) &&
                            $ ffgenerator [6]
         ffdelimitercycler = DL.concat (DL.take (DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs)) 
                             (DL.cycle [";","?",":","~","~"]))
-
---indexAdder -> This function will 
---add indexes to the input list.
-indexAdder :: [[String]] -> [[(String,Int,Int)]]
-indexAdder [] = []
-indexAdder xs = orderList xs (matchedReplication xs [0..(DL.length xs - 1)]) (nestedCycle xs [0..])
  
---addNonFilters -> This function will
---add back the non-filtered fields.
-addNonFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
-addNonFilters [] []    (_:_) = []
-addNonFilters [] (_:_) _     = []
-addNonFilters [] []    []    = []
-addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
-    where
-        --Nested function definitions.--
-        --regexFilter
-        regexFilter :: [String] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]]
-        regexFilter [] []     = []
-        regexFilter [] _      = []
-        regexFilter _  []     = []
-        regexFilter xs (y:ys) = if regexPredicate xs y
-                                    then [[quadrupletTransform ((DL.head y),"HEADER")] 
-                                      ++ (DL.map (\x -> quadrupletTransform (x,"NA")) (DL.tail y))] 
-                                      ++ (regexFilter xs ys)
-                                    else regexFilter xs ys
-        --regexPredicate
-        regexPredicate :: [String] -> [(String,Int,Int)] -> Bool
-        regexPredicate []  _ = False
-        regexPredicate _  [] = False 
-        regexPredicate xs ys = if (Main.tripletFst (DL.head ys)) `DL.elem` xs 
-                                   then False
-                                   else True 
-        --------------------------------
-
---reorderList -> This function will
---reorder a list based on another list.
-reorderList :: [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
-reorderList []     [] = []
-reorderList []     _  = []
-reorderList _      [] = []
-reorderList (x:xs) ys = (DL.filter (\y -> quadrupletFst (y DL.!! 0) == Main.tripletFst (x DL.!! 0) &&
-                                          quadrupletSnd (y DL.!! 0) == Main.tripletSnd (x DL.!! 0) &&
-                                          quadrupletThrd (y DL.!! 0) == Main.tripletThrd (x DL.!! 0)) ys)
-                     ++ (reorderList xs ys)
-
---addFilteringBinaryColumns -> This function will
---add filtering binary (0 or 1) to each row
---for each filter.
-addFilteringBinaryColumns :: [[String]] -> [[(String,Int,Int,String)]] -> [Int] -> [[(String,Int,Int,String)]]
-addFilteringBinaryColumns []     [] []        = []
-addFilteringBinaryColumns []     []    (_:_)  = []
-addFilteringBinaryColumns []     (_:_) _      = []
-addFilteringBinaryColumns (_:_)  _     []     = []
-addFilteringBinaryColumns (x:xs) ys    (z:zs) = ys ++ ([smallerAddFilteringBinaryColumns x ys z] 
-                                                   ++  (addFilteringBinaryColumns xs ys zs))
-    where
-        --Nested function definitions.--
-        --smallerAddFilteringBinaryColumns
-        smallerAddFilteringBinaryColumns :: [String] -> [[(String,Int,Int,String)]] -> Int -> [(String,Int,Int,String)]
-        smallerAddFilteringBinaryColumns [] [] _  = []
-        smallerAddFilteringBinaryColumns _  [] _  = []
-        smallerAddFilteringBinaryColumns [] _  _  = []
-        smallerAddFilteringBinaryColumns xs ys zs = smallestAddFilteringBinaryColumns (DL.concat 
-                                                                                      (DL.filter (\(y:_) -> 
-                                                                                      ((xs DL.!! 1) == (quadrupletFst y))) 
-                                                                                      ys))
-                                                                                      (zs)
-        --smallestAddFilteringBinaryColumns
-        smallestAddFilteringBinaryColumns :: [(String,Int,Int,String)] -> Int -> [(String,Int,Int,String)]
-        smallestAddFilteringBinaryColumns []             _  = []
-        smallestAddFilteringBinaryColumns ((a,b,_,d):xs) ys = if | (d == "NA") ->
-                                                                   [("1",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys)
-                                                                 | (d == "BINARYYES") ->
-                                                                   [("1",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys)
-                                                                 | (d == "BINARYNO") ->
-                                                                   [("0",b,ys,"FILTERCOLUMN")] ++ (smallestAddFilteringBinaryColumns xs ys) 
-                                                                 | (d == "HEADER") ->
-                                                                   [(a ++ "_BINARY",b,ys,"HEADER")] 
-                                                                 ++ (smallestAddFilteringBinaryColumns xs ys)
-                                                                 | otherwise -> smallestAddFilteringBinaryColumns xs ys
-        --------------------------------
-
---copyColumnFormatting -> This function will
---copy the formatting of one column and apply
---it to another non-filtered column.
-copyColumnFormatting :: [[(String,Int,Int,String)]] -> [(String,String)] -> [String] -> [[(String,Int,Int,String)]]
-copyColumnFormatting []    [] []    = []
-copyColumnFormatting []    [] (_:_) = []
-copyColumnFormatting (_:_) [] _     = []
-copyColumnFormatting xs    ys zs    = reorderFormatting 
-                                      (notdestinationcolumns ++ (applyFormatting xs ys))
-                                      xs
-    where
-        --Local functions.-- 
-        --applyFormatting
-        applyFormatting :: [[(String,Int,Int,String)]] -> [(String,String)] -> [[(String,Int,Int,String)]]
-        applyFormatting []    []     = []
-        applyFormatting []    _      = []
-        applyFormatting _     []     = []
-        applyFormatting xs    (y:ys) = [smallApplyFormatting sourcecolumn destinationcolumn] 
-                                    ++ (applyFormatting xs ys) 
-            where
-                --Local definitions.--
-                sourcecolumn = DL.concat (DL.filter (\x -> case x of
-                                                           [] -> False
-                                                           x  -> (fst y) == quadrupletFst (x DL.!! 0)) xs)
-                destinationcolumn = DL.concat (DL.filter (\x -> case x of
-                                                                [] -> False
-                                                                x  -> (snd y) == quadrupletFst (x DL.!! 0)) xs)
-                ----------------------
-        --smallApplyFormatting
-        smallApplyFormatting :: [(String,Int,Int,String)] -> [(String,Int,Int,String)] -> [(String,Int,Int,String)]
-        smallApplyFormatting []             []             = []
-        smallApplyFormatting _              []             = []
-        smallApplyFormatting []             _              = []
-        smallApplyFormatting ((_,_,_,d):xs) ((e,f,g,_):ys) = [(e,f,g,d)] ++ (smallApplyFormatting xs ys)
-        --reorderFormatting
-        reorderFormatting :: [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
-        reorderFormatting [] []     = []
-        reorderFormatting _  []     = []
-        reorderFormatting [] _      = []
-        reorderFormatting xs (y:ys) = (DL.filter (\a -> case a of
-                                                        [] -> False 
-                                                        a  -> quadrupletFst (a DL.!! 0) == quadrupletFst (y DL.!! 0) &&
-                                                              quadrupletSnd (a DL.!! 0) == quadrupletSnd (y DL.!! 0) &&
-                                                              quadrupletThrd (a DL.!! 0) == quadrupletThrd (y DL.!! 0)) xs)
-                                   ++ (reorderFormatting xs ys)
-        --Local definitions.--
-        notdestinationcolumns = DL.filter (\x-> (quadrupletFst (x DL.!! 0)) `DL.notElem` zs) xs
-        ----------------------
-
---filterFields -> This function will
---filter a field by the corresponding
---field.
-filterFields :: [Flag] -> [[String]] -> [[(String,Int,Int,String)]]
-filterFields []   [] = []
-filterFields opts xs = do --Grab just "FIELDS". 
-                          let ffields = singleunnest (DL.filter (isFilterFields) opts)
-                          --Extract the string from FilterFields. 
-                          let ffstring = extractFilterFields ffields
-                          --Remove beginning and ending delimiters.
-                          let begendremoved = DL.init (DL.tail ffstring)
-                          --Push the separate filtrations into a list.
-                          let filteringlist = DLS.splitOn ";" begendremoved
-                          --Get the field separated from the filtration condition.
-                          let fieldandcondition = DL.map (DLS.splitOneOf "?:~") filteringlist 
-                          --Add indexes to xs.
-                          let indexedxs = indexAdder xs
-                          --Call specificFilters on fieldandcondition. 
-                          let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
-                          --Add back the nonfilteredlists.
-                          let nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered 
-                          --Reorder nonfiltersadded.
-                          let reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded 
-                          --Tranpose reorderedlist.
-                          let transposedreorderedlist = DL.transpose reorderedlist 
-                               --User provides AddFilteringStatus and AddFilteringBinaries flag.
-                          if | DL.elem AddFilteringStatus opts &&
-                               DL.elem AddFilteringBinaries opts -> 
-                             do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
-                                                              ++ (DL.map (\x -> 
-                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x) 
-                                                                         then x ++ [("Fail"
-                                                                                    ,quadrupletSnd (DL.last x)
-                                                                                    ,(quadrupletThrd (DL.last x)) + 1
-                                                                                    ,"BINARYNO")]
-                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
-                                                                                                            (d == "TRINARYHEAD") ||
-                                                                                                            (d == "TRINARYMIDDLE") ||
-                                                                                                            (d == "TRINARYTAIL")) x)
-                                                                                 then x ++ [("Not_filtered"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"NA")]
-                                                                                 else x ++ [("Pass"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"BINARYYES")]) 
-                                                                 (DL.tail transposedreorderedlist))
-                                --Add extra column header to Name Pass/Fail column just added.
-                                let filteringstatus = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
-                                                                                              ,0
-                                                                                              ,DL.length prefinalizedtransposedlist + 1
-                                                                                              ,"HEADER")]]
-                                                   ++ (DL.tail prefinalizedtransposedlist)
-                                --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                                let finalfilteringstatus = DL.transpose (addFilteringBinaryColumns 
-                                                                        (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition) 
-                                                                        (DL.transpose filteringstatus)
-                                                                        ([((DL.length filteringstatus) + 1)..((DL.length filteringstatus) 
-                                                                      + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY") 
-                                                                        fieldandcondition)))]))
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 -> 
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head 
-                                                                                                (DL.filter 
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map 
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalfilteringstatus) 
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalfilteringstatus 
-                                                   
-                                                    
-                               --User provides only AddFilteringStatus flag.
-                             | DL.elem AddFilteringStatus opts &&
-                               DL.notElem AddFilteringBinaries opts -> 
-                             do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
-                                                              ++ (DL.map (\x ->
-                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
-                                                                         then x ++ [("Fail"
-                                                                                    ,quadrupletSnd (DL.last x)
-                                                                                    ,(quadrupletThrd (DL.last x)) + 1
-                                                                                    ,"BINARYNO")]
-                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
-                                                                                                            (d == "TRINARYHEAD") ||
-                                                                                                            (d == "TRINARYMIDDLE") ||
-                                                                                                            (d == "TRINARYTAIL")) x)
-                                                                                 then x ++ [("Not_filtered"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"NA")]
-                                                                                 else x ++ [("Pass"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"BINARYYES")])
-                                                                 (DL.tail transposedreorderedlist))
-                                --Add extra column header to Name Pass/Fail column just added.
-                                let finalizedtransposedlist = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
-                                                                                                      ,0
-                                                                                                      ,DL.length prefinalizedtransposedlist + 1
-                                                                                                      ,"HEADER")]]
-                                                           ++ (DL.tail prefinalizedtransposedlist)
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedtransposedlist)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalizedtransposedlist 
-                                     
-                                      
-                               --User provides only AddFilteringBinaries flag.
-                             | DL.notElem AddFilteringStatus opts &&
-                               DL.elem AddFilteringBinaries opts -> 
-                             do --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                                let finalizedbinarycolumns = DL.transpose (addFilteringBinaryColumns
-                                                                          (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
-                                                                          (DL.transpose transposedreorderedlist)
-                                                                          ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
-                                                                        + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                                                          fieldandcondition)))]))
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedbinarycolumns)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalizedbinarycolumns 
-                               --User didn't provide AddFilteringStatus or AddFilteringBinaries flag.
-                             | otherwise -> 
-                             do --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose transposedreorderedlist)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> transposedreorderedlist 
-                                                        
-                                                         
-
 {-------------------------}
 
 
@@ -998,6 +555,74 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                
         ----------------------
 
+--hideColumns -> This function will
+--hide column(s) from view within an
+--excel worksheet.
+hideColumns :: [[(String,Int,Int,String)]] -> [Flag] -> [ColumnsProperties]
+hideColumns [] []   = []
+hideColumns _  []   = []
+hideColumns [] _    = []
+hideColumns xs opts = do
+    --Grab just "HIDECOLUMNS".
+    let hidecolumns = DL.head (DL.filter (isHideColumns) opts)
+    --Extract the string from HideColumns.
+    let hidecolumnstring = extractHideColumns hidecolumns
+    --Prepare hidecolumnstring.
+    let finalhidecolumnstring = DLS.splitOn "," (DL.tail (DL.init hidecolumnstring))
+    --Call smallHideColumns.
+    setColumnsProperties xs finalhidecolumnstring
+
+--setColumnsProperties -> This function will
+--set ColumnsProperties.
+setColumnsProperties :: [[(String,Int,Int,String)]] -> [String] -> [ColumnsProperties]
+setColumnsProperties [] []     = []
+setColumnsProperties _  []     = []
+setColumnsProperties [] _      = []
+setColumnsProperties xs (y:ys) = (smallSetColumnsProperties xs y) ++ (setColumnsProperties xs ys)
+    where
+        --Local function.--
+        --smallSetColumnsProperties
+        smallSetColumnsProperties :: [[(String,Int,Int,String)]] -> String -> [ColumnsProperties]
+        smallSetColumnsProperties []     [] = []
+        smallSetColumnsProperties _      [] = []
+        smallSetColumnsProperties []     _  = []
+        smallSetColumnsProperties (x:xs) ys = (smallerSetColumnsProperties x ys) ++ (smallSetColumnsProperties xs ys)
+        --smallerSetColumnsProperties
+        smallerSetColumnsProperties :: [(String,Int,Int,String)] -> String -> [ColumnsProperties]
+        smallerSetColumnsProperties xs     ys = if | (quadrupletFst (xs DL.!! 0)) == ys ->
+                                                   [ ColumnsProperties
+                                                     { cpMin = (quadrupletThrd (xs DL.!! 0)) + 1
+                                                     , cpMax = (quadrupletThrd (xs DL.!! 0)) + 1
+                                                     , cpWidth = Nothing
+                                                     , cpStyle = Nothing
+                                                     , cpHidden = True
+                                                     , cpCollapsed = True
+                                                     , cpBestFit = False
+                                                     }]
+                                                   | otherwise -> []
+   
+        ------------------- 
+
+--allColumns -> This function will
+--format all columns on an
+--excel worksheet.
+allColumns :: [[(String,Int,Int,String)]] -> [ColumnsProperties]
+allColumns []     = []
+allColumns (x:xs) = (smallAllColumns x) ++ (allColumns xs)
+    where
+        --smallAllColumns
+        smallAllColumns :: [(String,Int,Int,String)] -> [ColumnsProperties]
+        smallAllColumns [] = []
+        smallAllColumns xs = [ ColumnsProperties
+                             { cpMin = (quadrupletThrd (xs DL.!! 0)) + 1
+                             , cpMax = (quadrupletThrd (xs DL.!! 0)) + 1
+                             , cpWidth = Just 14.0
+                             , cpStyle = Nothing
+                             , cpHidden = False
+                             , cpCollapsed = False
+                             , cpBestFit = True
+                             }]
+
 --createAndPrintXlsx -> This function will
 --create and print the xlsx file.
 createAndPrintXlsx :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
@@ -1016,173 +641,345 @@ createAndPrintXlsx opts xs = do
     --Add finalcellmap to filledworksheet.
     --Check for FullProtection flag.
     if | DL.elem FullProtection opts -> 
-       do --Use fullwsprotection as defined in FatDefinitions.hs.
-          let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
-                                             , _wsRowPropertiesMap = defaultrowpropertiesmap
-                                             , _wsCells = finalcellmap
-                                             , _wsDrawing = defaultwsdrawing
-                                             , _wsMerges = defaultwsmerges
-                                             , _wsSheetViews = defaultwssheetviews
-                                             , _wsPageSetup = defaultwspagesetup
-                                             , _wsConditionalFormattings = defaultwsconditionalformattings
-                                             , _wsDataValidations = defaultwsdatavalidations
-                                             , _wsPivotTables = defaultwspivottables
-                                             , _wsAutoFilter = defaultwsautofilter
-                                             , _wsTables = defaultwstables
-                                             , _wsProtection = fullwsprotection 
-                                             , _wsSharedFormulas = defaultwssharedformulas 
-                                             }
-          --Check for OutputSheetName flag.
-          if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-             do --Grab just "OUTFILENAME".
-                let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
-                --Extract the string from OutputFileName.
-                let outsheetnamestring = extractOutputSheetName outsheetname
-                --Grab just "STYLESHEETCHOICE".
-                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                --Extract the string from OutputFileName.
-                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
-                --If stylesheetchoicestring == "default".
-                if | stylesheetchoicestring == "default" ->
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet defaultstylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                   | otherwise -> 
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet vaccinestylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-             | otherwise ->
-             do --Set xlsxsheetname.
-                let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                --Grab just "STYLESHEETCHOICE".
-                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                --Extract the string from OutputFileName.
-                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
-                --If stylesheetchoicestring == "default".
-                if | stylesheetchoicestring == "default" ->
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet defaultstylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                   | otherwise -> 
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet vaccinestylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-       | otherwise -> 
-       do --Use defaultwsprotection as defined in FatDefinitions.hs.
-          let filledworksheet = CX.Worksheet { _wsColumnsProperties = defaultcolumnproperties
-                                             , _wsRowPropertiesMap = defaultrowpropertiesmap
-                                             , _wsCells = finalcellmap
-                                             , _wsDrawing = defaultwsdrawing
-                                             , _wsMerges = defaultwsmerges
-                                             , _wsSheetViews = defaultwssheetviews
-                                             , _wsPageSetup = defaultwspagesetup
-                                             , _wsConditionalFormattings = defaultwsconditionalformattings
-                                             , _wsDataValidations = defaultwsdatavalidations
-                                             , _wsPivotTables = defaultwspivottables
-                                             , _wsAutoFilter = defaultwsautofilter
-                                             , _wsTables = defaultwstables
-                                             , _wsProtection = defaultwsprotection
-                                             , _wsSharedFormulas = defaultwssharedformulas
-                                             }
-          --Check for OutputSheetName flag.
-          if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-             do --Grab just "OUTFILENAME".
-                let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
-                --Extract the string from OutputFileName.
-                let outsheetnamestring = extractOutputSheetName outsheetname
-                --Grab just "STYLESHEETCHOICE".
-                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                --Extract the string from OutputFileName.
-                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
-                --If stylesheetchoicestring == "default".
-                if | stylesheetchoicestring == "default" ->
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet defaultstylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                   | otherwise -> 
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet vaccinestylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-              | otherwise ->
-              do --Set xlsxsheetname.
-                let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                --Grab just "STYLESHEETCHOICE".
-                let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                --Extract the string from OutputFileName.
-                let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
-                --If stylesheetchoicestring == "default".
-                if | stylesheetchoicestring == "default" ->
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet defaultstylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+       do --Check for HideColumns flag..
+          if | DL.length (DL.filter (isHideColumns) opts) > 0 ->
+             do --Call hideColumms.
+                let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
+                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                                   , _wsCells = finalcellmap
+                                                   , _wsDrawing = defaultwsdrawing
+                                                   , _wsMerges = defaultwsmerges
+                                                   , _wsSheetViews = defaultwssheetviews
+                                                   , _wsPageSetup = defaultwspagesetup
+                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
+                                                   , _wsDataValidations = defaultwsdatavalidations
+                                                   , _wsPivotTables = defaultwspivottables
+                                                   , _wsAutoFilter = defaultwsautofilter
+                                                   , _wsTables = defaultwstables
+                                                   , _wsProtection = fullwsprotection
+                                                   , _wsSharedFormulas = defaultwssharedformulas
+                                                   }
+                --Check for OutputSheetName flag.
+                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+                   do --Grab just "OUTFILENAME".
+                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                      --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName outsheetname
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
                    | otherwise ->
-                   do --Add filledworksheet to filledxlsx.
-                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                               , _xlStyles = renderStyleSheet vaccinestylesheet
-                                               , _xlDefinedNames = defaultxldefinednames
-                                               , _xlCustomProperties = defaultxlcustomproperties
-                                               , _xlDateBase = defaultxldatebase
-                                               }
-                      --Grab time.
-                      currenttime <- DTCP.getPOSIXTime
-                      --Print out filledxlsx file.
-                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   do --Set xlsxsheetname.
+                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+             | otherwise ->
+             do --Use defaultwsprotection as defined in FatDefinitions.hs.
+                let filledworksheet = CX.Worksheet { _wsColumnsProperties = allColumns (DL.transpose xs)
+                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                                   , _wsCells = finalcellmap
+                                                   , _wsDrawing = defaultwsdrawing
+                                                   , _wsMerges = defaultwsmerges
+                                                   , _wsSheetViews = defaultwssheetviews
+                                                   , _wsPageSetup = defaultwspagesetup
+                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
+                                                   , _wsDataValidations = defaultwsdatavalidations
+                                                   , _wsPivotTables = defaultwspivottables
+                                                   , _wsAutoFilter = defaultwsautofilter
+                                                   , _wsTables = defaultwstables
+                                                   , _wsProtection = fullwsprotection
+                                                   , _wsSharedFormulas = defaultwssharedformulas
+                                                   }
+                --Check for OutputSheetName flag.
+                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+                   do --Grab just "OUTFILENAME".
+                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                      --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName outsheetname
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                    | otherwise ->
+                    do --Set xlsxsheetname.
+                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+       | otherwise -> 
+       do --Check for HideColumns flag..
+          if | DL.length (DL.filter (isHideColumns) opts) > 0 ->
+             do --Call hideColumns
+                let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
+                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                                   , _wsCells = finalcellmap
+                                                   , _wsDrawing = defaultwsdrawing
+                                                   , _wsMerges = defaultwsmerges
+                                                   , _wsSheetViews = defaultwssheetviews
+                                                   , _wsPageSetup = defaultwspagesetup
+                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
+                                                   , _wsDataValidations = defaultwsdatavalidations
+                                                   , _wsPivotTables = defaultwspivottables
+                                                   , _wsAutoFilter = defaultwsautofilter
+                                                   , _wsTables = defaultwstables
+                                                   , _wsProtection = defaultwsprotection 
+                                                   , _wsSharedFormulas = defaultwssharedformulas 
+                                                   }
+                --Check for OutputSheetName flag.
+                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+                   do --Grab just "OUTFILENAME".
+                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                      --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName outsheetname
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise -> 
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise ->
+                   do --Set xlsxsheetname.
+                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise -> 
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+             | otherwise -> 
+             do --Use defaultwsprotection as defined in FatDefinitions.hs.
+                let filledworksheet = CX.Worksheet { _wsColumnsProperties = allColumns (DL.transpose xs)
+                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                                   , _wsCells = finalcellmap
+                                                   , _wsDrawing = defaultwsdrawing
+                                                   , _wsMerges = defaultwsmerges
+                                                   , _wsSheetViews = defaultwssheetviews
+                                                   , _wsPageSetup = defaultwspagesetup
+                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
+                                                   , _wsDataValidations = defaultwsdatavalidations
+                                                   , _wsPivotTables = defaultwspivottables
+                                                   , _wsAutoFilter = defaultwsautofilter
+                                                   , _wsTables = defaultwstables
+                                                   , _wsProtection = defaultwsprotection
+                                                   , _wsSharedFormulas = defaultwssharedformulas
+                                                   }
+                --Check for OutputSheetName flag.
+                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
+                   do --Grab just "OUTFILENAME".
+                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                      --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName outsheetname
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise -> 
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                    | otherwise ->
+                    do --Set xlsxsheetname.
+                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
+                      --Grab just "STYLESHEETCHOICE".
+                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
+                      --Extract the string from OutputFileName.
+                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      --If stylesheetchoicestring == "default".
+                      if | stylesheetchoicestring == "default" ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet defaultstylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                         | otherwise ->
+                         do --Add filledworksheet to filledxlsx.
+                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
+                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
+                                                     , _xlDefinedNames = defaultxldefinednames
+                                                     , _xlCustomProperties = defaultxlcustomproperties
+                                                     , _xlDateBase = defaultxldatebase
+                                                     }
+                            --Grab time.
+                            currenttime <- DTCP.getPOSIXTime
+                            --Print out filledxlsx file.
+                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
 
 {-----------------}
 

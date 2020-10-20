@@ -36,14 +36,14 @@ defaultworksheet = def Worksheet
 --Defines default _wsColumnsProperties data type value.
 defaultcolumnproperties :: [ColumnsProperties]
 defaultcolumnproperties = [ ColumnsProperties
-    { cpMin = 4
-    , cpMax = 4
-    , cpWidth = Just 14.1640625
-    , cpStyle = Nothing
-    , cpHidden = False
-    , cpCollapsed = False
-    , cpBestFit = True
-    }]
+                          { cpMin = 0
+                          , cpMax = 0
+                          , cpWidth = Nothing
+                          , cpStyle = Nothing
+                          , cpHidden = False
+                          , cpCollapsed = False
+                          , cpBestFit = True
+                          }]
 
 --Defines default _wsRowPropertiesMap data type value.
 defaultrowpropertiesmap :: Map Int RowProperties

@@ -22,6 +22,13 @@ module SpecificFilters where
 {--------}
 
 
+{-Import modules.-}
+
+import Common
+
+{----------------}
+
+
 {-Imports-}
 
 import Control.Arrow as CA
@@ -37,75 +44,6 @@ import Text.Regex.TDFA as TRP
 
 
 {-specificFilters functions.-}
-
---isSubsetOf -> This function will
---be used in the stripHeader function.
-xs `isSubsetOf` ys = DL.any (`DL.elem` ys) xs
-
---isAlphaList -> This function will
---test a string for only alphabetic
---characters.
-isAlphaList :: String -> Bool
-isAlphaList xs = DL.all DC.isAlpha xs
-
---isNotAlphaList -> This function will
---test a String for non-alphabetic
---characters.
-isNotAlphaList :: String -> Bool
-isNotAlphaList xs = not (DL.all DC.isAlpha xs)
-
---mapTuple -> This function will
---map a function across all elements
---of a two-tuple.
-mapTuple :: (b'->c') -> (b',b') -> (c',c')
-mapTuple = CM.join (***)
-
---tuplifyTwo -> This function will
---turn a list of two elements into
---a two-tuple.
-tuplifyTwo :: [a] -> (a,a)
-tuplifyTwo [x,y] = (x,y)
-
---tripletFst -> This function will
---act as a fst but for a triplet.
-tripletFst :: (String,Int,Int) -> String
-tripletFst (x,y,z) = x
-
---tripletSnd -> This function will
---act as a snd but for a triplet.
-tripletSnd :: (String,Int,Int) -> Int
-tripletSnd (x,y,z) = y
-
---tripletFst -> This function will
---act to grab the third element of a triplet.
-tripletThrd :: (String,Int,Int) -> Int
-tripletThrd (x,y,z) = z
-
---quadrupletFst -> This function will
---act act to grab first element of a triplet.
-quadrupletFst :: (String,Int,Int,String) -> String
-quadrupletFst (a,b,c,d) = a
-
---quadrupletSnd -> This function will
---act act to grab second element of a triplet.
-quadrupletSnd :: (String,Int,Int,String) -> Int
-quadrupletSnd (a,b,c,d) = b
-
---quadrupletThrd -> This function will
---act act to grab third element of a triplet.
-quadrupletThrd :: (String,Int,Int,String) -> Int
-quadrupletThrd (a,b,c,d) = c
-
---quadrupletThrd -> This function will
---act act to grab last element of a triplet.
-quadrupletFrth :: (String,Int,Int,String) -> String
-quadrupletFrth (a,b,c,d) = d
-
---quadrupletTransform -> This function will
---transform a complex tuple into a 
---traditional quadruplet.
-quadrupletTransform :: ((String,Int,Int),String) -> (String,Int,Int,String)
-quadrupletTransform ((a,b,c),d) = (a,b,c,d)
 
 --customListFilter -> This function will
 --perform a custom, regex-based filtration

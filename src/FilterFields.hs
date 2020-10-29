@@ -213,7 +213,8 @@ filterFields opts xs = do --Grab just "FIELDS".
                           --Add indexes to xs.
                           let indexedxs = indexAdder xs
                           --Call specificFilters on fieldandcondition.
-                          let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
+                          --let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
+                          let specificfiltered = specificFilters filteringlist (DL.transpose indexedxs)
                           --Add back the nonfilteredlists.
                           let nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered
                           --Reorder nonfiltersadded.

@@ -17,7 +17,7 @@ module FatDefinitions where
 {-Imports-}
 
 import Codec.Xlsx as CX
-import Data.Map as DMap
+import qualified Data.Map as DMap
 import Data.Text as DText
 
 {---------}
@@ -45,9 +45,9 @@ defaultcolumnproperties = [ ColumnsProperties
                           , cpBestFit = True
                           }]
 
---Defines default _wsRowPropertiesMap data type value.
-defaultrowpropertiesmap :: Map Int RowProperties
-defaultrowpropertiesmap = (fromList []) :: Map Int RowProperties
+--Defines default _wsRowPropertiesDMap.Map data type value.
+defaultrowpropertiesmap :: DMap.Map Int RowProperties
+defaultrowpropertiesmap = (DMap.fromList []) :: DMap.Map Int RowProperties
 
 --Defines default _wsDrawing data type value.
 defaultwsdrawing :: Maybe a
@@ -101,12 +101,12 @@ defaultwspagesetup :: Maybe a
 defaultwspagesetup = Nothing
 
 --Defines default _wsConditionalFormattings data type value.
-defaultwsconditionalformattings :: Map SqRef ConditionalFormatting
-defaultwsconditionalformattings = (fromList []) :: Map SqRef ConditionalFormatting
+defaultwsconditionalformattings :: DMap.Map SqRef ConditionalFormatting
+defaultwsconditionalformattings = (DMap.fromList []) :: DMap.Map SqRef ConditionalFormatting
 
 --Defines default_wsDataValidations data type value.
-defaultwsdatavalidations :: Map SqRef DataValidation
-defaultwsdatavalidations = (fromList []) :: Map SqRef DataValidation
+defaultwsdatavalidations :: DMap.Map SqRef DataValidation
+defaultwsdatavalidations = (DMap.fromList []) :: DMap.Map SqRef DataValidation
 
 --Defines default _wsPivotTables data type value.
 defaultwspivottables :: [a]
@@ -129,8 +129,8 @@ fullwsprotection :: Maybe SheetProtection
 fullwsprotection = Just fullSheetProtection
 
 --Defines default _wsSharedFormulas data type value.
-defaultwssharedformulas :: Map SharedFormulaIndex SharedFormulaOptions
-defaultwssharedformulas = (fromList []) ::  Map SharedFormulaIndex SharedFormulaOptions
+defaultwssharedformulas :: DMap.Map SharedFormulaIndex SharedFormulaOptions
+defaultwssharedformulas = (DMap.fromList []) ::  DMap.Map SharedFormulaIndex SharedFormulaOptions
 
 --Defines the default StyleSheet.
 defaultstylesheet :: StyleSheet
@@ -583,7 +583,7 @@ defaultstylesheet = StyleSheet
             }
         ]
     , _styleSheetDxfs = []
-    , _styleSheetNumFmts = fromList []
+    , _styleSheetNumFmts = DMap.fromList []
     }
 
 --Defines the vaccine trials StyleSheet.
@@ -1210,7 +1210,7 @@ vaccinestylesheet = StyleSheet
             }
         ]
     , _styleSheetDxfs = []
-    , _styleSheetNumFmts = fromList []
+    , _styleSheetNumFmts = DMap.fromList []
     }
 
 --Defines default _xlDefinedNames data type value.
@@ -1218,8 +1218,8 @@ defaultxldefinednames :: DefinedNames
 defaultxldefinednames = DefinedNames []
 
 --Defines default _xlCustomProperties data type value.
-defaultxlcustomproperties :: Map Text Variant
-defaultxlcustomproperties = (fromList []) ::  Map Text Variant
+defaultxlcustomproperties :: DMap.Map Text Variant
+defaultxlcustomproperties = (DMap.fromList []) ::  DMap.Map Text Variant
 
 --Defines default _xlDateBase data type value.
 defaultxldatebase :: DateBase

@@ -49,20 +49,20 @@ import Text.Regex.TDFA as TRP
 {-Custom specificFilters Datatype and related functions.-}
 
 --Define SpecificFilter data tree.
-data SpecificFilters a = Requirement (Ffields -> Bool)
-                       | Ilist a
+data SFFilter a = SFRequirement (Ffields -> Bool)
+                | Ilist a
 
 --Define helper data tree functions for SpecificFilters.
-iff :: (Ffields -> Bool) -> Forest (SpecificFilters a) -> Tree (SpecificFilters a)
-iff = Node . Requirement
+iffsf :: (Ffields -> Bool) -> Forest (SFFilter a) -> Tree (SFFilter a)
+iffsf = Node . SFRequirement
 
-addilist :: a -> Tree (SpecificFilters a)
+addilist :: a -> Tree (SFFilter a)
 addilist = flip Node [] . Ilist
 
 --Define tree search function.
-specificFiltersDecide :: Ffields -> Tree (SpecificFilters a) -> Maybe a
+specificFiltersDecide :: Ffields -> Tree (SFFilter a) -> Maybe a
 specificFiltersDecide x (Node (Ilist y) _) = Just y
-specificFiltersDecide x (Node (Requirement p) subtree)
+specificFiltersDecide x (Node (SFRequirement p) subtree)
     | p x = asum $ map (specificFiltersDecide x) subtree
     | otherwise = Nothing
 
@@ -469,14 +469,14 @@ specificFilters (x:xs) ys = do
             onlydata = customOnlyDataFilter (extractCompareField ffields) matchedys
             --Grab the entire portion of matchedys that is the column header.
             notdata = customNotDataFilter (extractCompareField ffields) matchedys
-            --Define filters data (decision) tree.
+            --Define specificfilterstree data (decision) tree.
             specificfilterstree =
-                iff (const True) [
-                    iff (binaryCompareType) [
-                        iff (isNotAlphaListCompareFieldType) [
-                            iff (elemPlusCompareOperator) [
-                                iff (isInfixOfLessThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                iffsf (const True) [
+                    iffsf (binaryCompareType) [
+                        iffsf (isNotAlphaListCompareFieldType) [
+                            iffsf (elemPlusCompareOperator) [
+                                iffsf (isInfixOfLessThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -487,7 +487,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))]) 
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -500,8 +500,8 @@ specificFilters (x:xs) ys = do
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ]
                                 ], 
-                                iff (isInfixOfGreaterThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                                iffsf (isInfixOfGreaterThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -512,7 +512,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -526,9 +526,9 @@ specificFilters (x:xs) ys = do
                                     ]
                                 ] 
                             ],  
-                            iff (elemMinusCompareOperator) [
-                                iff (isInfixOfLessThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                            iffsf (elemMinusCompareOperator) [
+                                iffsf (isInfixOfLessThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -539,7 +539,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -552,8 +552,8 @@ specificFilters (x:xs) ys = do
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ]
                                 ],                              
-                                iff (isInfixOfGreaterThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                                iffsf (isInfixOfGreaterThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -564,7 +564,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -578,9 +578,9 @@ specificFilters (x:xs) ys = do
                                     ]
                                 ]
                             ],  
-                            iff (elemDivisionSignCompareOperator) [
-                                iff (isInfixOfLessThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                            iffsf (elemDivisionSignCompareOperator) [
+                                iffsf (isInfixOfLessThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -591,7 +591,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -604,8 +604,8 @@ specificFilters (x:xs) ys = do
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ]
                                 ],
-                                iff (isInfixOfGreaterThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
+                                iffsf (isInfixOfGreaterThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -616,7 +616,7 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"BINARYNO")
                                                            else quadrupletTransform (allys,"NA")) onlydata))])
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstY) [
+                                    iffsf (checkCompareFieldTypeCommaFstY) [
                                         addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                    (DL.map (\allys@(y,_,_) -> 
                                                        if ',' `DL.elem` y
@@ -630,10 +630,10 @@ specificFilters (x:xs) ys = do
                                     ]
                                 ]
                             ],
-                            iff (elemPipeCompareOperator) [
-                                iff (isInfixOfLessThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
-                                        iff (checkCompareFieldTypeCommaSndUnderscore) [
+                            iffsf (elemPipeCompareOperator) [
+                                iffsf (isInfixOfLessThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
+                                        iffsf (checkCompareFieldTypeCommaSndUnderscore) [
                                             addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                        (DL.map (\allys@(y,_,_) -> 
                                                            if ',' `DL.elem` y
@@ -645,8 +645,8 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"NA")) onlydata))])
                                         ]
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstUnderscore) [
-                                        iff (checkCompareFieldTypeCommaSndY) [
+                                    iffsf (checkCompareFieldTypeCommaFstUnderscore) [
+                                        iffsf (checkCompareFieldTypeCommaSndY) [
                                             addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                        (DL.map (\allys@(y,_,_) -> 
                                                            if ',' `DL.elem` y
@@ -659,9 +659,9 @@ specificFilters (x:xs) ys = do
                                         ]
                                     ]
                                 ],
-                                iff (isInfixOfGreaterThanCompareString) [
-                                    iff (checkCompareFieldTypeCommaFstX) [
-                                        iff (checkCompareFieldTypeCommaSndUnderscore) [
+                                iffsf (isInfixOfGreaterThanCompareString) [
+                                    iffsf (checkCompareFieldTypeCommaFstX) [
+                                        iffsf (checkCompareFieldTypeCommaSndUnderscore) [
                                             addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                        (DL.map (\allys@(y,_,_) -> 
                                                            if ',' `DL.elem` y
@@ -673,8 +673,8 @@ specificFilters (x:xs) ys = do
                                                                else quadrupletTransform (allys,"NA")) onlydata))])
                                         ]
                                     ],
-                                    iff (checkCompareFieldTypeCommaFstUnderscore) [
-                                        iff (checkCompareFieldTypeCommaSndY) [
+                                    iffsf (checkCompareFieldTypeCommaFstUnderscore) [
+                                        iffsf (checkCompareFieldTypeCommaSndY) [
                                             addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                        (DL.map (\allys@(y,_,_) -> 
                                                            if ',' `DL.elem` y
@@ -689,9 +689,9 @@ specificFilters (x:xs) ys = do
                                 ]
                             ]
                         ],
-                        iff (isAlphaListCompareFieldType) [
-                            iff (elemPipeCompareOperator) [
-                                iff (isInfixOfLessThanCompareString) [
+                        iffsf (isAlphaListCompareFieldType) [
+                            iffsf (elemPipeCompareOperator) [
+                                iffsf (isInfixOfLessThanCompareString) [
                                     addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                ((DL.map (\allys@(y,_,_) -> 
                                                     if not (y =~ "NA" :: Bool) ||
@@ -703,7 +703,7 @@ specificFilters (x:xs) ys = do
                                                             else quadrupletTransform (allys,"BINARYNO")
                                                         else quadrupletTransform (allys,"NA")) onlydata)))]) 
                                 ],
-                                iff (isInfixOfGreaterThanCompareString) [
+                                iffsf (isInfixOfGreaterThanCompareString) [
                                     addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                 ((DL.map (\allys@(y,_,_) -> 
                                                      if not (y =~ "NA" :: Bool) ||
@@ -715,7 +715,7 @@ specificFilters (x:xs) ys = do
                                                              else quadrupletTransform (allys,"BINARYNO")
                                                          else quadrupletTransform (allys,"NA")) onlydata)))]) 
                                 ],
-                                iff (isInfixOfEqualSignCompareString) [
+                                iffsf (isInfixOfEqualSignCompareString) [
                                     addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                (DL.concat 
                                                (equalityListCheckBinary 
@@ -726,9 +726,9 @@ specificFilters (x:xs) ys = do
                             ]
                         ]
                     ],
-                    iff (trinaryCompareType) [
-                        iff (isAlphaListCompareFieldType) [
-                            iff (elemPipeCompareOperator) [ 
+                    iffsf (trinaryCompareType) [
+                        iffsf (isAlphaListCompareFieldType) [
+                            iffsf (elemPipeCompareOperator) [ 
                                 addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                            (DL.concat 
                                            (equalityListCheckTrinary 

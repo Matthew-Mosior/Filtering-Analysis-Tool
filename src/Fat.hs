@@ -414,8 +414,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                  --If user defined "default" for StyleSheetChoice.
                                                  if | stylesheetchoicestring == "default" ->
                                                     --Header fields (":HEADER").
-                                                    if | d == "HEADER" || 
-                                                         a == "Filtering_Status" ->
+                                                    if | d == "HEADER" ->
                                                          ([(y,Cell { _cellStyle = Just 1
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -423,8 +422,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --Binary passing fields (":BINARYYES").
-                                                       | d == "BINARYYES" || 
-                                                         a == "Pass" ->
+                                                       | d == "BINARYYES" ->
                                                          ([(y,Cell { _cellStyle = Just 2
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -432,8 +430,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --Binary failing fields (":BINARYNO").
-                                                       | d == "BINARYNO"|| 
-                                                         a == "Fail" ->
+                                                       | d == "BINARYNO" ->
                                                          ([(y,Cell { _cellStyle = Just 4
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -465,8 +462,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --NA fields (":NA").
-                                                       | d == "NA" || 
-                                                         a == "Not_filtered" ->
+                                                       | d == "NA" ->
                                                          ([(y,Cell { _cellStyle = Just 3
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -484,8 +480,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                        | otherwise -> createCellMap xs ys opts
                                                     | otherwise ->
                                                     --Header fields (":HEADER").
-                                                    if | d == "HEADER" ||
-                                                         a == "Filtering_Status" ->
+                                                    if | d == "HEADER" ->
                                                          ([(y,Cell { _cellStyle = Just 2
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -493,8 +488,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --Binary passing fields (":BINARYYES").
-                                                       | d == "BINARYYES" ||
-                                                         a == "Pass" ->
+                                                       | d == "BINARYYES" ->
                                                          ([(y,Cell { _cellStyle = Just 4
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -502,8 +496,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --Binary failing fields (":BINARYNO").
-                                                       | d == "BINARYNO"||
-                                                         a == "Fail" ->
+                                                       | d == "BINARYNO" ->
                                                          ([(y,Cell { _cellStyle = Just 6
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing
@@ -535,8 +528,7 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
                                                                    }
                                                          )]) ++ (createCellMap xs ys opts)
                                                        --NA fields (":NA").
-                                                       | d == "NA" ||
-                                                         a == "Not_filtered" ->
+                                                       | d == "NA" ->
                                                          ([(y,Cell { _cellStyle = Just 5
                                                                    , _cellValue = Just (CellText (DText.pack a))
                                                                    , _cellComment = Nothing

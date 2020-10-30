@@ -32,11 +32,57 @@ import SpecificFilters
 
 {-Imports-}
 
+import Data.Foldable as DF
 import Data.List as DL
 import Data.List.Split as DLS
+import Data.Maybe as DMaybe
+import Data.Tree as DTree
 
 {---------}
 
+
+{-Custom filterFields Datatype and related functions.-}
+
+--Define FFFilter data tree.
+data FFFilter a = FFRequirement ([Flag] -> Bool)
+                | Flist a
+
+--Define helper data tree functions for SpecificFilters.
+iffff :: ([Flag] -> Bool) -> Forest (FFFilter a) -> Tree (FFFilter a)
+iffff = Node . FFRequirement
+
+addflist :: a -> Tree (FFFilter a)
+addflist = flip Node [] . Flist
+
+--Define tree search function.
+filterFieldsDecide :: [Flag] -> Tree (FFFilter a) -> Maybe a
+filterFieldsDecide x (Node (Flist y) _) = Just y
+filterFieldsDecide x (Node (FFRequirement p) subtree)
+    | p x = asum $ map (filterFieldsDecide x) subtree
+    | otherwise = Nothing
+
+--Define boolAddFilteringStatus
+boolAddFilteringStatus :: [Flag] -> Bool
+boolAddFilteringStatus xs = if | DL.elem AddFilteringStatus xs
+                               -> True
+                               | otherwise
+                               -> False
+
+--Define boolAddFilteringBinaries
+boolAddFilteringBinaries :: [Flag] -> Bool
+boolAddFilteringBinaries xs = if | DL.elem AddFilteringBinaries xs
+                                 -> True
+                                 | otherwise
+                                 -> False
+
+--Define boolIsCopyColumnFormatting
+boolIsCopyColumnFormatting :: [Flag] -> Bool
+boolIsCopyColumnFormatting xs = if | DL.length (DL.filter (isCopyColumnFormatting) xs) > 0 
+                                   -> True
+                                   | otherwise
+                                   -> False
+
+{--------------------------------------------------------}
 
 {-filterFields functions.-}
 
@@ -195,182 +241,226 @@ copyColumnFormatting xs    ys zs    = reorderFormatting
         notdestinationcolumns = DL.filter (\x-> (quadrupletFst (x DL.!! 0)) `DL.notElem` zs) xs
         ----------------------
 
+--addPassOrFail -> This function will
+--add pass or fail remarks to each line.
+addPassOrFail :: [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
+addPassOrFail []     = []
+addPassOrFail (x:xs) = if | (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
+                          -> [x ++ [("Fail"
+                                    ,quadrupletSnd (DL.last x)
+                                    ,(quadrupletThrd (DL.last x)) + 1
+                                    ,"BINARYNO")]] ++ (addPassOrFail xs)
+                          | (DL.all (\(_,_,_,d) -> (d == "NA")            ||
+                                                   (d == "TRINARYHEAD")   ||
+                                                   (d == "TRINARYMIDDLE") ||
+                                                   (d == "TRINARYTAIL")) x)
+                          -> [x ++ [("Not_filtered"
+                                    ,quadrupletSnd (DL.last x)
+                                    ,(quadrupletThrd (DL.last x)) + 1
+                                    ,"NA")]] ++ (addPassOrFail xs)
+                          | otherwise 
+                          -> [x ++ [("Pass"
+                                    ,quadrupletSnd (DL.last x)
+                                    ,(quadrupletThrd (DL.last x)) + 1
+                                    ,"BINARYYES")]] ++ (addPassOrFail xs)  
+
+--addFilteringStatusColumnHeader -> This function will
+--add the Filtering_Status to the first sublist.
+addFilteringStatusColumnHeader :: [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
+addFilteringStatusColumnHeader [] = []
+addFilteringStatusColumnHeader xs = [DL.head xs ++ [("Filtering_Status"
+                                                    ,0
+                                                    ,DL.length xs + 1
+                                                    ,"HEADER")]]
+                                                ++ (DL.tail xs) 
+
 --filterFields -> This function will
 --filter a field by the corresponding
 --field.
 filterFields :: [Flag] -> [[String]] -> [[(String,Int,Int,String)]]
 filterFields []   [] = []
-filterFields opts xs = do --Grab just "FIELDS".
-                          let ffields = singleunnest (DL.filter (isFilterFields) opts)
-                          --Extract the string from FilterFields.
-                          let ffstring = extractFilterFields ffields
-                          --Remove beginning and ending delimiters.
-                          let begendremoved = DL.init (DL.tail ffstring)
-                          --Push the separate filtrations into a list.
-                          let filteringlist = DLS.splitOn ";" begendremoved
-                          --Get the field separated from the filtration condition.
-                          let fieldandcondition = DL.map (DLS.splitOneOf "?:~") filteringlist
-                          --Add indexes to xs.
-                          let indexedxs = indexAdder xs
-                          --Call specificFilters on fieldandcondition.
-                          --let specificfiltered = specificFilters fieldandcondition (DL.transpose indexedxs)
-                          let specificfiltered = specificFilters filteringlist (DL.transpose indexedxs)
-                          --Add back the nonfilteredlists.
-                          let nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered
-                          --Reorder nonfiltersadded.
-                          let reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded
-                          --Tranpose reorderedlist.
-                          let transposedreorderedlist = DL.transpose reorderedlist
-                               --User provides AddFilteringStatus and AddFilteringBinaries flag.
-                          if | DL.elem AddFilteringStatus opts &&
-                               DL.elem AddFilteringBinaries opts ->
-                             do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
-                                                              ++ (DL.map (\x ->
-                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
-                                                                         then x ++ [("Fail"
-                                                                                    ,quadrupletSnd (DL.last x)
-                                                                                    ,(quadrupletThrd (DL.last x)) + 1
-                                                                                    ,"BINARYNO")]
-                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
-                                                                                                            (d == "TRINARYHEAD") ||
-                                                                                                            (d == "TRINARYMIDDLE") ||
-                                                                                                            (d == "TRINARYTAIL")) x)
-                                                                                 then x ++ [("Not_filtered"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"NA")]
-                                                                                 else x ++ [("Pass"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"BINARYYES")])
-                                                                 (DL.tail transposedreorderedlist))
-                                --Add extra column header to Name Pass/Fail column just added.
-                                let filteringstatus = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
-                                                                                              ,0
-                                                                                              ,DL.length prefinalizedtransposedlist + 1
-                                                                                              ,"HEADER")]]
-                                                   ++ (DL.tail prefinalizedtransposedlist)
-                                --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                                let finalfilteringstatus = DL.transpose (addFilteringBinaryColumns
-                                                                        (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
-                                                                        (DL.transpose filteringstatus)
-                                                                        ([((DL.length filteringstatus) + 1)..((DL.length filteringstatus)
-                                                                      + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                                                        fieldandcondition)))]))
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalfilteringstatus)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalfilteringstatus
-
-
-                               --User provides only AddFilteringStatus flag.
-                             | DL.elem AddFilteringStatus opts &&
-                               DL.notElem AddFilteringBinaries opts ->
-                             do --Add Pass or Fail remark to end of all but first list of lists.
-                                let prefinalizedtransposedlist = [DL.head transposedreorderedlist]
-                                                              ++ (DL.map (\x ->
-                                                                     if (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
-                                                                         then x ++ [("Fail"
-                                                                                    ,quadrupletSnd (DL.last x)
-                                                                                    ,(quadrupletThrd (DL.last x)) + 1
-                                                                                    ,"BINARYNO")]
-                                                                             else if (DL.all (\(_,_,_,d) -> (d == "NA") ||
-                                                                                                            (d == "TRINARYHEAD") ||
-                                                                                                            (d == "TRINARYMIDDLE") ||
-                                                                                                            (d == "TRINARYTAIL")) x)
-                                                                                 then x ++ [("Not_filtered"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"NA")]
-                                                                                 else x ++ [("Pass"
-                                                                                            ,quadrupletSnd (DL.last x)
-                                                                                            ,(quadrupletThrd (DL.last x)) + 1
-                                                                                            ,"BINARYYES")])
-                                                                 (DL.tail transposedreorderedlist))
-                                --Add extra column header to Name Pass/Fail column just added.
-                                let finalizedtransposedlist = [DL.head prefinalizedtransposedlist ++ [("Filtering_Status"
-                                                                                                      ,0
-                                                                                                      ,DL.length prefinalizedtransposedlist + 1
-                                                                                                      ,"HEADER")]]
-                                                           ++ (DL.tail prefinalizedtransposedlist)
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedtransposedlist)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalizedtransposedlist
-
-
-                               --User provides only AddFilteringBinaries flag.
-                             | DL.notElem AddFilteringStatus opts &&
-                               DL.elem AddFilteringBinaries opts ->
-                             do --Add Pass (1) or Fail (0) binary notation to each filtered column.
-                                let finalizedbinarycolumns = DL.transpose (addFilteringBinaryColumns
-                                                                          (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
-                                                                          (DL.transpose transposedreorderedlist)
-                                                                          ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
-                                                                        + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                                                          fieldandcondition)))]))
-                                --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose finalizedbinarycolumns)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> finalizedbinarycolumns
-                               --User didn't provide AddFilteringStatus or AddFilteringBinaries flag.
-                             | otherwise ->
-                             do --Check for CopyColumnFormatting flag.
-                                if | DL.length (DL.filter (isCopyColumnFormatting) opts) > 0 ->
-                                   do let copycolumnformattingstr = extractCopyColumnFormatting (DL.head
-                                                                                                (DL.filter
-                                                                                                (isCopyColumnFormatting) opts))
-                                      let allcolumnssplit = DL.map (\[x,y] -> (x,y))
-                                                            (DL.map
-                                                            (DLS.splitOn ":")
-                                                            (DLS.splitOn ";"
-                                                            (DL.init
-                                                            (DL.tail copycolumnformattingstr))))
-                                      let alldestinationcolumns = DL.map (snd) allcolumnssplit
-                                      --Return output of copyColumnFormatting.
-                                      DL.transpose (copyColumnFormatting (DL.transpose transposedreorderedlist)
-                                                                         (allcolumnssplit)
-                                                                         (alldestinationcolumns))
-                                   | otherwise -> transposedreorderedlist
+filterFields opts xs = do 
+    --Search the specificfilterstree decision tree on user-defined flags.
+    (DMaybe.fromJust (filterFieldsDecide opts filterfieldstree))
+        where
+            --Grab just "FIELDS".
+            ffields = singleunnest (DL.filter (isFilterFields) opts)
+            --Extract the string from FilterFields.
+            ffstring = extractFilterFields ffields
+            --Remove beginning and ending delimiters.
+            begendremoved = DL.init (DL.tail ffstring)
+            --Push the separate filtrations into a list.
+            filteringlist = DLS.splitOn ";" begendremoved
+            --Get the field separated from the filtration condition.
+            fieldandcondition = DL.map (DLS.splitOneOf "?:~") filteringlist
+            --Add indexes to xs.
+            indexedxs = indexAdder xs
+            --Call specificFilters on fieldandcondition.
+            specificfiltered = specificFilters filteringlist (DL.transpose indexedxs)
+            --Add back the nonfilteredlists.
+            nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered
+            --Reorder nonfiltersadded.
+            reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded
+            --Tranpose reorderedlist.
+            transposedreorderedlist = DL.transpose reorderedlist
+            --Define filterfieldstree data (decision) tree.
+            filterfieldstree =
+                iffff (const True) [
+                    iffff (boolAddFilteringStatus) [
+                        iffff (boolAddFilteringBinaries) [
+                            iffff (boolIsCopyColumnFormatting) [
+                                addflist ( DL.transpose 
+                                           (copyColumnFormatting
+                                           (addFilteringBinaryColumns
+                                           (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                           (DL.transpose (addFilteringStatusColumnHeader
+                                                         ([DL.head transposedreorderedlist]
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                           ([((DL.length (addFilteringStatusColumnHeader
+                                                         ([DL.head transposedreorderedlist]
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist))))) + 1)
+                                           ..((DL.length (addFilteringStatusColumnHeader
+                                                         ([DL.head transposedreorderedlist]
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                                       + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
+                                                         fieldandcondition)))]))
+                                           (DL.map (\[x,y] -> (x,y))
+                                           (DL.map
+                                           (DLS.splitOn ":")
+                                           (DLS.splitOn ";"
+                                           (DL.init
+                                           (DL.tail 
+                                           (extractCopyColumnFormatting 
+                                           (DL.head
+                                           (DL.filter
+                                           (isCopyColumnFormatting) opts))))))))
+                                           (DL.map (snd) 
+                                           (DL.map (\[x,y] -> (x,y))
+                                           (DL.map
+                                           (DLS.splitOn ":")
+                                           (DLS.splitOn ";"
+                                           (DL.init
+                                           (DL.tail
+                                           (extractCopyColumnFormatting
+                                           (DL.head
+                                           (DL.filter
+                                           (isCopyColumnFormatting) opts)))))))))))
+                            ],
+                            addflist ((addFilteringBinaryColumns
+                                      (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                      (DL.transpose (addFilteringStatusColumnHeader
+                                                    ([DL.head transposedreorderedlist]
+                                                 ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                      ([((DL.length (addFilteringStatusColumnHeader
+                                                    ([DL.head transposedreorderedlist]
+                                                 ++ (addPassOrFail (DL.tail transposedreorderedlist))))) + 1)
+                                      ..((DL.length (addFilteringStatusColumnHeader
+                                                    ([DL.head transposedreorderedlist]
+                                                 ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                                  + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
+                                                    fieldandcondition)))])))
+                        ],
+                        addflist ((addFilteringStatusColumnHeader
+                                  ([DL.head transposedreorderedlist]
+                               ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                    ],
+                    iffff (boolAddFilteringBinaries) [
+                        iffff (boolIsCopyColumnFormatting) [
+                            addflist ( DL.transpose
+                                       (copyColumnFormatting
+                                       (addFilteringBinaryColumns
+                                       (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                       (DL.transpose transposedreorderedlist)
+                                       ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
+                                     + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
+                                       fieldandcondition)))]))
+                                       (DL.map (\[x,y] -> (x,y))
+                                       (DL.map
+                                       (DLS.splitOn ":")
+                                       (DLS.splitOn ";"
+                                       (DL.init
+                                       (DL.tail
+                                       (extractCopyColumnFormatting
+                                       (DL.head
+                                       (DL.filter
+                                       (isCopyColumnFormatting) opts))))))))
+                                       (DL.map (snd)
+                                       (DL.map (\[x,y] -> (x,y))
+                                       (DL.map
+                                       (DLS.splitOn ":")
+                                       (DLS.splitOn ";"
+                                       (DL.init
+                                       (DL.tail
+                                       (extractCopyColumnFormatting
+                                       (DL.head
+                                       (DL.filter
+                                       (isCopyColumnFormatting) opts)))))))))))              
+                        ],
+                        addflist ((DL.transpose (addFilteringBinaryColumns
+                                   (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                   (DL.transpose transposedreorderedlist)
+                                   ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
+                                 + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
+                                   fieldandcondition)))]))))  
+                    ],
+                    iffff (boolAddFilteringStatus) [
+                        iffff (boolIsCopyColumnFormatting) [
+                            addflist ( DL.transpose
+                                       (copyColumnFormatting
+                                       (DL.transpose
+                                       (addFilteringStatusColumnHeader
+                                       ([DL.head transposedreorderedlist]
+                                    ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                       (DL.map (\[x,y] -> (x,y))
+                                       (DL.map
+                                       (DLS.splitOn ":")
+                                       (DLS.splitOn ";"
+                                       (DL.init
+                                       (DL.tail
+                                       (extractCopyColumnFormatting
+                                       (DL.head
+                                       (DL.filter
+                                       (isCopyColumnFormatting) opts))))))))
+                                       (DL.map (snd)
+                                       (DL.map (\[x,y] -> (x,y))
+                                       (DL.map
+                                       (DLS.splitOn ":")
+                                       (DLS.splitOn ";"
+                                       (DL.init
+                                       (DL.tail
+                                       (extractCopyColumnFormatting
+                                       (DL.head
+                                       (DL.filter
+                                       (isCopyColumnFormatting) opts)))))))))))
+                        ]
+                    ],
+                    iffff (boolIsCopyColumnFormatting) [
+                        addflist ( DL.transpose
+                                   (copyColumnFormatting
+                                   (DL.transpose transposedreorderedlist)
+                                   (DL.map (\[x,y] -> (x,y))
+                                   (DL.map
+                                   (DLS.splitOn ":")
+                                   (DLS.splitOn ";"
+                                   (DL.init
+                                   (DL.tail
+                                   (extractCopyColumnFormatting
+                                   (DL.head
+                                   (DL.filter
+                                   (isCopyColumnFormatting) opts))))))))
+                                   (DL.map (snd)
+                                   (DL.map (\[x,y] -> (x,y))
+                                   (DL.map
+                                   (DLS.splitOn ":")
+                                   (DLS.splitOn ";"
+                                   (DL.init
+                                   (DL.tail
+                                   (extractCopyColumnFormatting
+                                   (DL.head
+                                   (DL.filter
+                                   (isCopyColumnFormatting) opts)))))))))))
+                    ],
+                    addflist (transposedreorderedlist) 
+                ]
 
 {-------------------------}

@@ -26,6 +26,7 @@ module FilterFields where
 
 import Common
 import SpecificFilters
+import YamlParser
 
 {----------------}
 
@@ -33,9 +34,11 @@ import SpecificFilters
 {-Imports-}
 
 import Data.Foldable as DF
+import Data.HashMap.Strict as DHS
 import Data.List as DL
 import Data.List.Split as DLS
 import Data.Maybe as DMaybe
+import Data.Text as DText
 import Data.Tree as DTree
 
 {---------}
@@ -44,71 +47,56 @@ import Data.Tree as DTree
 {-Custom filterFields Datatype and related functions.-}
 
 --Define FFFilter data tree.
-data FFFilter a = FFRequirement ([Flag] -> Bool)
+data FFFilter a = FFRequirement (FATConfig -> Bool)
                 | Flist a
 
 --Define helper data tree functions for SpecificFilters.
-iffff :: ([Flag] -> Bool) -> Forest (FFFilter a) -> Tree (FFFilter a)
+iffff :: (FATConfig -> Bool) -> Forest (FFFilter a) -> Tree (FFFilter a)
 iffff = Node . FFRequirement
 
 addflist :: a -> Tree (FFFilter a)
 addflist = flip Node [] . Flist
 
 --Define tree search function.
-filterFieldsDecide :: [Flag] -> Tree (FFFilter a) -> Maybe a
+filterFieldsDecide :: FATConfig -> Tree (FFFilter a) -> Maybe a
 filterFieldsDecide x (Node (Flist y) _) = Just y
 filterFieldsDecide x (Node (FFRequirement p) subtree)
-    | p x = asum $ map (filterFieldsDecide x) subtree
+    | p x = asum $ DL.map (filterFieldsDecide x) subtree
     | otherwise = Nothing
 
---Define boolAddFilteringStatus
-boolAddFilteringStatus :: [Flag] -> Bool
-boolAddFilteringStatus xs = if | DL.elem AddFilteringStatus xs
-                               -> True
-                               | otherwise
-                               -> False
-
---Define boolAddFilteringBinaries
-boolAddFilteringBinaries :: [Flag] -> Bool
-boolAddFilteringBinaries xs = if | DL.elem AddFilteringBinaries xs
-                                 -> True
-                                 | otherwise
-                                 -> False
-
---Define boolIsCopyColumnFormatting
-boolIsCopyColumnFormatting :: [Flag] -> Bool
-boolIsCopyColumnFormatting xs = if | DL.length (DL.filter (isCopyColumnFormatting) xs) > 0 
+--Define boolTrueAddFilteringStatus
+boolTrueAddFilteringStatus :: FATConfig -> Bool
+boolTrueAddFilteringStatus xs = if | DMaybe.fromJust (extractAddFilteringStatus xs)
                                    -> True
                                    | otherwise
                                    -> False
 
+--Define boolTrueAddFilteringBinaries
+boolTrueAddFilteringBinaries :: FATConfig -> Bool
+boolTrueAddFilteringBinaries xs = if | DMaybe.fromJust (extractAddFilteringBinaries xs)
+                                     -> True
+                                     | otherwise
+                                     -> False
+
+--boolIsCopyColumnFormatting
+boolIsCopyColumnFormatting :: FATConfig -> Bool
+boolIsCopyColumnFormatting xs = if | isCopyColumnFormatting xs
+                                   -> True
+                                   | otherwise
+                                   -> False
+
+--extractAllBinaryFilteringType
+extractAllBinaryFilteringType :: FATConfig -> [String]
+extractAllBinaryFilteringType xs = DL.map (snd)
+                                   (DL.filter (\(x,y) -> x == "BINARY")
+                                   (DL.zip
+                                   (DL.map (extractFilteringType) (extractFiltering xs))
+                                   (DL.map (extractFilteringColumn) (extractFiltering xs))))
+            
 {--------------------------------------------------------}
 
+
 {-filterFields functions.-}
-
---isFilterFields -> This function will
---test for FilterFields flag.
-isFilterFields :: Flag -> Bool
-isFilterFields (FilterFields _) = True
-isFilterFields _                = False
-
---extractFilterFields -> This function will
---extract the string associated with
---FilterFields.
-extractFilterFields :: Flag -> String
-extractFilterFields (FilterFields x) = x
-
---isCopyColumnFormatting -> This function will
---test for CopyColumnFormatting flag.
-isCopyColumnFormatting :: Flag -> Bool
-isCopyColumnFormatting (CopyColumnFormatting _) = True
-isCopyColumnFormatting _                        = False
-
---extractCopyColumnFormatting -> This function will
---extract the string associated with
---CopyColumnFormatting.
-extractCopyColumnFormatting :: Flag -> String
-extractCopyColumnFormatting (CopyColumnFormatting x) = x
 
 --indexAdder -> This function will
 --add indexes to the input list.
@@ -118,11 +106,11 @@ indexAdder xs = orderList xs (matchedReplication xs [0..(DL.length xs - 1)]) (ne
 
 --addNonFilters -> This function will
 --add back the non-filtered fields.
-addNonFilters :: [[String]] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
+addNonFilters :: [String] -> [[(String,Int,Int)]] -> [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
 addNonFilters [] []    (_:_) = []
 addNonFilters [] (_:_) _     = []
 addNonFilters [] []    []    = []
-addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
+addNonFilters xs ys    zs    = (regexFilter xs ys) ++ zs
     where
         --Nested function definitions.--
         --regexFilter
@@ -130,18 +118,20 @@ addNonFilters xs ys    zs    = (regexFilter (DL.map (DL.!! 1) xs) ys) ++ zs
         regexFilter [] []     = []
         regexFilter [] _      = []
         regexFilter _  []     = []
-        regexFilter xs (y:ys) = if regexPredicate xs y
-                                    then [[quadrupletTransform ((DL.head y),"HEADER")]
-                                      ++ (DL.map (\x -> quadrupletTransform (x,"NA")) (DL.tail y))]
-                                      ++ (regexFilter xs ys)
-                                    else regexFilter xs ys
+        regexFilter xs (y:ys) = if | regexPredicate xs y
+                                   -> [[quadrupletTransform ((DL.head y),"HEADER")]
+                                     ++ (DL.map (\x -> quadrupletTransform (x,"NA")) (DL.tail y))]
+                                     ++ (regexFilter xs ys)
+                                   | otherwise
+                                   -> regexFilter xs ys
         --regexPredicate
         regexPredicate :: [String] -> [(String,Int,Int)] -> Bool
         regexPredicate []  _ = False
         regexPredicate _  [] = False
-        regexPredicate xs ys = if (tripletFst (DL.head ys)) `DL.elem` xs
-                                   then False
-                                   else True
+        regexPredicate xs ys = if | (tripletFst (DL.head ys)) `DL.elem` xs
+                                  -> False
+                                  | otherwise
+                                  -> True
         --------------------------------
 
 --reorderList -> This function will
@@ -158,7 +148,7 @@ reorderList (x:xs) ys = (DL.filter (\y -> quadrupletFst (y DL.!! 0) == tripletFs
 --addFilteringBinaryColumns -> This function will
 --add filtering binary (0 or 1) to each row
 --for each filter.
-addFilteringBinaryColumns :: [[String]] -> [[(String,Int,Int,String)]] -> [Int] -> [[(String,Int,Int,String)]]
+addFilteringBinaryColumns :: [String] -> [[(String,Int,Int,String)]] -> [Int] -> [[(String,Int,Int,String)]]
 addFilteringBinaryColumns []     [] []        = []
 addFilteringBinaryColumns []     []    (_:_)  = []
 addFilteringBinaryColumns []     (_:_) _      = []
@@ -168,13 +158,13 @@ addFilteringBinaryColumns (x:xs) ys    (z:zs) = ys ++ ([smallerAddFilteringBinar
     where
         --Nested function definitions.--
         --smallerAddFilteringBinaryColumns
-        smallerAddFilteringBinaryColumns :: [String] -> [[(String,Int,Int,String)]] -> Int -> [(String,Int,Int,String)]
+        smallerAddFilteringBinaryColumns :: String -> [[(String,Int,Int,String)]] -> Int -> [(String,Int,Int,String)]
         smallerAddFilteringBinaryColumns [] [] _  = []
         smallerAddFilteringBinaryColumns _  [] _  = []
         smallerAddFilteringBinaryColumns [] _  _  = []
         smallerAddFilteringBinaryColumns xs ys zs = smallestAddFilteringBinaryColumns (DL.concat
                                                                                       (DL.filter (\(y:_) ->
-                                                                                      ((xs DL.!! 1) == (quadrupletFst y)))
+                                                                                      (xs == (quadrupletFst y)))
                                                                                       ys))
                                                                                       (zs)
         --smallestAddFilteringBinaryColumns
@@ -277,28 +267,18 @@ addFilteringStatusColumnHeader xs = [DL.head xs ++ [("Filtering_Status"
 --filterFields -> This function will
 --filter a field by the corresponding
 --field.
-filterFields :: [Flag] -> [[String]] -> [[(String,Int,Int,String)]]
-filterFields []   [] = []
+filterFields :: FATConfig -> [[String]] -> [[(String,Int,Int,String)]]
+filterFields _    [] = []
 filterFields opts xs = do 
     --Search the specificfilterstree decision tree on user-defined flags.
     (DMaybe.fromJust (filterFieldsDecide opts filterfieldstree))
         where
-            --Grab just "FIELDS".
-            ffields = singleunnest (DL.filter (isFilterFields) opts)
-            --Extract the string from FilterFields.
-            ffstring = extractFilterFields ffields
-            --Remove beginning and ending delimiters.
-            begendremoved = DL.init (DL.tail ffstring)
-            --Push the separate filtrations into a list.
-            filteringlist = DLS.splitOn ";" begendremoved
-            --Get the field separated from the filtration condition.
-            fieldandcondition = DL.map (DLS.splitOneOf "?:~") filteringlist
             --Add indexes to xs.
             indexedxs = indexAdder xs
             --Call specificFilters on fieldandcondition.
-            specificfiltered = specificFilters filteringlist (DL.transpose indexedxs)
+            specificfiltered = specificFilters opts (DL.transpose indexedxs)
             --Add back the nonfilteredlists.
-            nonfiltersadded = addNonFilters fieldandcondition (DL.transpose indexedxs) specificfiltered
+            nonfiltersadded = addNonFilters (DL.map (extractFilteringColumn) (extractFiltering opts)) (DL.transpose indexedxs) specificfiltered
             --Reorder nonfiltersadded.
             reorderedlist = reorderList (DL.transpose indexedxs) nonfiltersadded
             --Tranpose reorderedlist.
@@ -306,13 +286,13 @@ filterFields opts xs = do
             --Define filterfieldstree data (decision) tree.
             filterfieldstree =
                 iffff (const True) [
-                    iffff (boolAddFilteringStatus) [
-                        iffff (boolAddFilteringBinaries) [
+                    iffff (boolTrueAddFilteringStatus) [
+                        iffff (boolTrueAddFilteringBinaries) [
                             iffff (boolIsCopyColumnFormatting) [
                                 addflist ( DL.transpose 
                                            (copyColumnFormatting
                                            (addFilteringBinaryColumns
-                                           (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                           (extractAllBinaryFilteringType opts)
                                            (DL.transpose (addFilteringStatusColumnHeader
                                                          ([DL.head transposedreorderedlist]
                                                       ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
@@ -322,32 +302,15 @@ filterFields opts xs = do
                                            ..((DL.length (addFilteringStatusColumnHeader
                                                          ([DL.head transposedreorderedlist]
                                                       ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
-                                                       + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                                         fieldandcondition)))]))
-                                           (DL.map (\[x,y] -> (x,y))
-                                           (DL.map
-                                           (DLS.splitOn ":")
-                                           (DLS.splitOn ";"
-                                           (DL.init
-                                           (DL.tail 
-                                           (extractCopyColumnFormatting 
-                                           (DL.head
-                                           (DL.filter
-                                           (isCopyColumnFormatting) opts))))))))
-                                           (DL.map (snd) 
-                                           (DL.map (\[x,y] -> (x,y))
-                                           (DL.map
-                                           (DLS.splitOn ":")
-                                           (DLS.splitOn ";"
-                                           (DL.init
-                                           (DL.tail
-                                           (extractCopyColumnFormatting
-                                           (DL.head
-                                           (DL.filter
-                                           (isCopyColumnFormatting) opts)))))))))))
+                                                       + (DL.length (extractAllBinaryFilteringType opts)))]))
+                                           (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                   (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
+                                           (DL.map (snd) (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                         (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts)))))))  
+                                          
                             ],
                             addflist ((addFilteringBinaryColumns
-                                      (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                      (extractAllBinaryFilteringType opts)
                                       (DL.transpose (addFilteringStatusColumnHeader
                                                     ([DL.head transposedreorderedlist]
                                                  ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
@@ -357,53 +320,34 @@ filterFields opts xs = do
                                       ..((DL.length (addFilteringStatusColumnHeader
                                                     ([DL.head transposedreorderedlist]
                                                  ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
-                                                  + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                                    fieldandcondition)))])))
+                                                  + (DL.length (extractAllBinaryFilteringType opts)))])))
                         ],
                         addflist ((addFilteringStatusColumnHeader
                                   ([DL.head transposedreorderedlist]
                                ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
                     ],
-                    iffff (boolAddFilteringBinaries) [
+                    iffff (boolTrueAddFilteringBinaries) [
                         iffff (boolIsCopyColumnFormatting) [
                             addflist ( DL.transpose
                                        (copyColumnFormatting
                                        (addFilteringBinaryColumns
-                                       (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                       (extractAllBinaryFilteringType opts)
                                        (DL.transpose transposedreorderedlist)
                                        ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
-                                     + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                       fieldandcondition)))]))
-                                       (DL.map (\[x,y] -> (x,y))
-                                       (DL.map
-                                       (DLS.splitOn ":")
-                                       (DLS.splitOn ";"
-                                       (DL.init
-                                       (DL.tail
-                                       (extractCopyColumnFormatting
-                                       (DL.head
-                                       (DL.filter
-                                       (isCopyColumnFormatting) opts))))))))
-                                       (DL.map (snd)
-                                       (DL.map (\[x,y] -> (x,y))
-                                       (DL.map
-                                       (DLS.splitOn ":")
-                                       (DLS.splitOn ";"
-                                       (DL.init
-                                       (DL.tail
-                                       (extractCopyColumnFormatting
-                                       (DL.head
-                                       (DL.filter
-                                       (isCopyColumnFormatting) opts)))))))))))              
+                                     + (DL.length (extractAllBinaryFilteringType opts)))]))
+                                       (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                               (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
+                                       (DL.map (snd) (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                     (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))))) 
+                                   
                         ],
                         addflist ((DL.transpose (addFilteringBinaryColumns
-                                   (DL.filter (\x -> (x DL.!! 0) == "BINARY") fieldandcondition)
+                                   (extractAllBinaryFilteringType opts)
                                    (DL.transpose transposedreorderedlist)
                                    ([((DL.length transposedreorderedlist) + 1)..((DL.length transposedreorderedlist)
-                                 + (DL.length (DL.filter (\x -> (x DL.!! 0) == "BINARY")
-                                   fieldandcondition)))]))))  
+                                 + (DL.length (extractAllBinaryFilteringType opts)))]))))  
                     ],
-                    iffff (boolAddFilteringStatus) [
+                    iffff (boolTrueAddFilteringStatus) [
                         iffff (boolIsCopyColumnFormatting) [
                             addflist ( DL.transpose
                                        (copyColumnFormatting
@@ -411,54 +355,21 @@ filterFields opts xs = do
                                        (addFilteringStatusColumnHeader
                                        ([DL.head transposedreorderedlist]
                                     ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
-                                       (DL.map (\[x,y] -> (x,y))
-                                       (DL.map
-                                       (DLS.splitOn ":")
-                                       (DLS.splitOn ";"
-                                       (DL.init
-                                       (DL.tail
-                                       (extractCopyColumnFormatting
-                                       (DL.head
-                                       (DL.filter
-                                       (isCopyColumnFormatting) opts))))))))
-                                       (DL.map (snd)
-                                       (DL.map (\[x,y] -> (x,y))
-                                       (DL.map
-                                       (DLS.splitOn ":")
-                                       (DLS.splitOn ";"
-                                       (DL.init
-                                       (DL.tail
-                                       (extractCopyColumnFormatting
-                                       (DL.head
-                                       (DL.filter
-                                       (isCopyColumnFormatting) opts)))))))))))
+                                       (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                               (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
+                                       (DL.map (snd) (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                     (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))))) 
+                                       
                         ]
                     ],
                     iffff (boolIsCopyColumnFormatting) [
                         addflist ( DL.transpose
                                    (copyColumnFormatting
                                    (DL.transpose transposedreorderedlist)
-                                   (DL.map (\[x,y] -> (x,y))
-                                   (DL.map
-                                   (DLS.splitOn ":")
-                                   (DLS.splitOn ";"
-                                   (DL.init
-                                   (DL.tail
-                                   (extractCopyColumnFormatting
-                                   (DL.head
-                                   (DL.filter
-                                   (isCopyColumnFormatting) opts))))))))
-                                   (DL.map (snd)
-                                   (DL.map (\[x,y] -> (x,y))
-                                   (DL.map
-                                   (DLS.splitOn ":")
-                                   (DLS.splitOn ";"
-                                   (DL.init
-                                   (DL.tail
-                                   (extractCopyColumnFormatting
-                                   (DL.head
-                                   (DL.filter
-                                   (isCopyColumnFormatting) opts)))))))))))
+                                   (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                      (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
+                                   (DL.map (snd) (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                 (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts)))))))
                     ],
                     addflist (transposedreorderedlist) 
                 ]

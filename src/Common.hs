@@ -38,64 +38,10 @@ import Data.Tree as DT
 {-Custom CML Option Datatype.-}
 
 data Flag
-    = Verbose                     -- -v
-    | Version                     -- -V -?
-    | OutputFileName       String -- -o
-    | OutputSheetName      String -- -s
-    | StyleSheetChoice     String --
-    | FullProtection              --
-    | FilterFields         String -- -F
-    | AddFilteringStatus          -- -S
-    | AddFilteringBinaries        -- -B
-    | CopyColumnFormatting String -- -c
-    | HideColumns          String -- -H
-    | BinaryPassingColor   String -- -p (Default: #FFFF0000)
-    | BinaryFailingColor   String -- -f (Default: #FF00FF00)
-    | TrinaryHeadColor     String -- -h (Default: #FFFF0000)
-    | TrinaryMiddleColor   String -- -m (Default: #FFFFFF33)
-    | TrinaryTailColor     String -- -l (Default: #FF00FF00)
-    | NAColor              String -- -n (Default: #FFC0C0C0)
-    | Help                        -- --help
+    = Help -- --help
     deriving (Eq,Ord,Show)
 
 {-----------------------------}
-
-
-{-Custom filterfields Datatype and related functions.-}
-
-data Ffields = Ffields { comparetype      :: String
-                       , comparefield     :: String
-                       , comparefieldtype :: String  
-                       , compareoperator  :: String
-                       , comparestring    :: String 
-                       } deriving (Eq,Ord,Show,Read)
-
---extractCompareType -> This function will
---extract the string associated with comparetype.
-extractCompareType :: Ffields -> String
-extractCompareType (Ffields a _ _ _ _) = a
-
---extractCompareField -> This function will
---extract the string associated with comparefield.
-extractCompareField :: Ffields -> String
-extractCompareField (Ffields _ a _ _ _) = a
-
---extractCompareFieldType -> This function will
---extract the string associated with comparefieldtype.
-extractCompareFieldType :: Ffields -> String
-extractCompareFieldType (Ffields _ _ a _ _) = a
-
---extractCompareOperator -> This function will
---extract the string associated with compareoperator.
-extractCompareOperator :: Ffields -> String
-extractCompareOperator (Ffields _ _ _ a _) = a
-
---extractCompareString -> This function will
---extract the string associated with comparestring.
-extractCompareString :: Ffields -> String
-extractCompareString (Ffields _ _ _ _ a) = a
-
-{-----------------------------------------------------}
 
 
 {-Common functions.-}

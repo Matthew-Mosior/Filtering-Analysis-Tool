@@ -19,6 +19,7 @@
 import Common
 import FatDefinitions
 import FilterFields
+import YamlParser
 
 {----------------}
 
@@ -28,9 +29,11 @@ import FilterFields
 import Codec.Xlsx as CX
 import Control.Arrow as CA
 import Control.Monad as CM
+import Data.Aeson as DAeson
 import Data.ByteString.Char8 as DBC
 import Data.ByteString.Lazy as DBL
 import Data.Char as DC
+import Data.HashMap.Strict as DHS
 import Data.List as DL
 import Data.List.Split as DLS
 import Data.Ix as DI
@@ -39,6 +42,7 @@ import Data.Maybe as DMaybe
 import Data.Text as DText
 import Data.Time.Clock.POSIX as DTCP
 import Data.Tuple as DTuple
+import Data.Yaml as DYaml
 import System.Console.GetOpt as SCG
 import System.Environment as SE
 import System.Exit as SX
@@ -52,195 +56,13 @@ import Text.Regex.TDFA as TRP
 {---------}
 
 
-{-Custom bool functions for Flag Datatype.-}
-
---isOutputFileName -> This function will
---test for OutputFileName flag.
-isOutputFileName :: Flag -> Bool
-isOutputFileName (OutputFileName _) = True
-isOutputFileName _                  = False    
-
---isOutputSheetName -> This function will
---test for OutputSheetName flag.
-isOutputSheetName :: Flag -> Bool
-isOutputSheetName (OutputSheetName _) = True
-isOutputSheetName _                   = False
-
---isStyleSheetChoice -> This function will
---test for OutputSheetName flag.
-isStyleSheetChoice :: Flag -> Bool
-isStyleSheetChoice (StyleSheetChoice _) = True
-isStyleSheetChoice _                    = False
-
---isFilterFields -> This function will
---test for FilterFields flag.
-isFilterFields :: Flag -> Bool
-isFilterFields (FilterFields _) = True
-isFilterFields _                = False
-
---isCopyColumnFormatting -> This function will
---test for CopyColumnFormatting flag.
-isCopyColumnFormatting :: Flag -> Bool
-isCopyColumnFormatting (CopyColumnFormatting _) = True
-isCopyColumnFormatting _                        = False
-
---isHideColumns -> This function will
---test for HideColumn flag.
-isHideColumns :: Flag -> Bool
-isHideColumns (HideColumns _) = True
-isHideColumns _               = False
-
---isBinaryPassingColor -> This function will
---test for the BinaryPassingColor Flag.
-isBinaryPassingColor :: Flag -> Bool
-isBinaryPassingColor (BinaryPassingColor _) = True
-isBinaryPassingColor _                      = False
-
---isBinaryFailingColor -> This function will
---test for the BinaryFailingColor Flag.
-isBinaryFailingColor :: Flag -> Bool
-isBinaryFailingColor (BinaryFailingColor _) = True
-isBinaryFailingColor _                      = False
-
---isTrinaryHeadColor -> This function will
---test for the TrinaryHeadColor Flag.
-isTrinaryHeadColor :: Flag -> Bool
-isTrinaryHeadColor (TrinaryHeadColor _) = True
-isTrinaryHeadColor _                    = False
-
---isTrinaryMiddleColor -> This function will
---test for the TrinaryMiddleColor Flag.
-isTrinaryMiddleColor :: Flag -> Bool
-isTrinaryMiddleColor (TrinaryMiddleColor _) = True
-isTrinaryMiddleColor _                      = False
-
---isTrinaryTailColor -> This function will
---test for the TrinaryTailColor Flag.
-isTrinaryTailColor :: Flag -> Bool
-isTrinaryTailColor (TrinaryTailColor _) = True
-isTrinaryTailColor _                    = False
-
---isNAColor -> This function will
---test for the NAColor Flag.
-isNAColor :: Flag -> Bool
-isNAColor (NAColor _) = True
-isNAColor _           = False
-
-{------------------------------------------}
-
-
-{-Custom extraction functions for Flag Datatype.-}
-
---extractOutputFileName -> This function will
---extract the string associated with 
---OutputFileName.
-extractOutputFileName :: Flag -> String
-extractOutputFileName (OutputFileName x) = x
-
---extractOutputSheetName -> This function will
---extract the string associated with
---OutputSheetName.
-extractOutputSheetName :: Flag -> String
-extractOutputSheetName (OutputSheetName x) = x
-
---extractStyleSheetChoice -> This function will
---extract the string associated with
---StyleSheetChoice.
-extractStyleSheetChoice :: Flag -> String
-extractStyleSheetChoice (StyleSheetChoice x) = x
-
---extractFilterFields -> This function will
---extract the string associated with 
---FilterFields.
-extractFilterFields :: Flag -> String
-extractFilterFields (FilterFields x) = x
-
---extractCopyColumnFormatting -> This function will
---extract the string associated with
---CopyColumnFormatting.
-extractCopyColumnFormatting :: Flag -> String
-extractCopyColumnFormatting (CopyColumnFormatting x) = x
-
---extractHideColumns -> This function will
---extract the string associated with
---HideColumns.
-extractHideColumns :: Flag -> String
-extractHideColumns (HideColumns x) = x
-
---extractBinaryPassingColor -> This function will
---extract the string associated with
---BinaryPassingColor.
-extractBinaryPassingColor :: Flag -> String
-extractBinaryPassingColor (BinaryPassingColor x) = x
-
---extractBinaryFailingColor -> This function will
---extract the string associated with
---BinaryFailingColor.
-extractBinaryFailingColor :: Flag -> String
-extractBinaryFailingColor (BinaryFailingColor x) = x
-
---extractTrinaryHeadColor -> This function will
---extract the string associated with
---TrinaryHeadColor.
-extractTrinaryHeadColor :: Flag -> String
-extractTrinaryHeadColor (TrinaryHeadColor x) = x
-
---extractTrinaryMiddleColor -> This function will
---extract the string associated with
---TrinaryMiddleColor.
-extractTrinaryMiddleColor :: Flag -> String
-extractTrinaryMiddleColor (TrinaryMiddleColor x) = x
-
---extractTrinaryTailColor -> This function will
---extract the string associated with
---TrinaryTailColor.
-extractTrinaryTailColor :: Flag -> String
-extractTrinaryTailColor (TrinaryTailColor x) = x
-
---extractNAColor -> This function will
---extract the string associated with
---NAColor.
-extractNAColor :: Flag -> String
-extractNAColor (NAColor x) = x
-
-{------------------------------------------------}
-
-
 {-Option Description function relating to datatype above.-}
 
 --options -> This function will
 --describe flags.
 options :: [OptDescr Flag]
 options =
-    [ Option ['v']     ["verbose"]              (NoArg Verbose)                                      "Output on stderr.\n",
-      Option ['V','?'] ["version"]              (NoArg Version)                                      "Show version number.\n",
-      Option ['o']     ["outputfilename"]       (ReqArg OutputFileName "OUTFILENAME")                "The output file name.\n",
-      Option ['s']     ["outputsheetname"]      (ReqArg OutputSheetName "OUTSHEETNAME")              "The string to be used as the xlsx sheet name.\n",
-      Option []        ["stylesheet"]           (ReqArg StyleSheetChoice "STYLESHEET")               "The stylesheet to be used.\n",
-      Option []        ["fullprotection"]       (NoArg FullProtection)                               "Protect the workbook.\n",
-      Option ['F']     ["filterfields"]         (ReqArg FilterFields "FIELDS")                       "The fields to filter on.\n",
-      Option ['S']     ["addfilteringstatus"]   (NoArg AddFilteringStatus)                           "Add column to end of file describing\n\
-                                                                                                     \the filtering status of each row.\n",
-      Option ['B']     ["addfilteringbinaries"] (NoArg AddFilteringBinaries)                         "Add a column for each BINARY filter applied\n\
-                                                                                                     \denoting whether that variant passed (1) or\n\
-                                                                                                     \failed (0) that filter.\n",
-      Option ['c']     ["copycolumnformatting"] (ReqArg CopyColumnFormatting "COPYCOLUMNFORMATTING") "Copy column formatting of one column to\n\
-                                                                                                     \to another column (row-wise).\n",
-      Option ['H']     ["hidecolumns"]          (ReqArg HideColumns "HIDECOLUMNS")                   "Columns to hide from view within an excel\n\
-                                                                                                     \worksheet.\n",
-      Option ['p']     ["binarypassingcolor"]   (ReqArg BinaryPassingColor "BINARYPASSCOLOR")        "The ARGB hex value to use to fill passing cells with.\n\
-                                                                                                     \Default value: #FFFF0000\n",
-      Option ['f']     ["binaryfailingcolor"]   (ReqArg BinaryFailingColor "BINARYFAILCOLOR")        "The ARGB hex value to use to fill failing cells with.\n\
-                                                                                                     \Default value: #FF00FF00\n",
-      Option ['h']     ["trinaryheadcolor"]     (ReqArg TrinaryHeadColor "TRINARYHEADCOLOR")         "The ARGB hex value to use to fill head cells with.\n\
-                                                                                                     \Default value: #FFFF0000\n",
-      Option ['m']     ["trinarymiddlecolor"]   (ReqArg TrinaryMiddleColor "TRINARYMIDCOLOR")        "The ARGB hex value to use to fill middle cells with.\n\
-                                                                                                     \Default value: #FFFFFF33\n",
-      Option ['l']     ["trinarytailcolor"]     (ReqArg TrinaryTailColor "TRINARYTAILCOLOR")         "The ARGB hex value to use to fill tail cells with.\n\
-                                                                                                     \Default value: ##FF00FF00\n",
-      Option ['n']     ["nacolor"]              (ReqArg NAColor "NACOLOR")                           "The ARGB hex value to use to fill non-filtered cells with.\n\
-                                                                                                     \Default value: #FFC0C0C0\n",  
-      Option []        ["help"]                 (NoArg Help)                                         "Print this help message.\n"
+    [ Option ['h'] ["help"] (NoArg Help) "Print this help message.\n"
     ] 
 
 {---------------------------------------------------------}
@@ -250,150 +72,86 @@ options =
 
 --compilerOpts -> This function will
 --parse incoming command line arguments.
-compilerOpts :: [String] -> IO ([Flag],String)
+compilerOpts :: [String] -> IO ([Flag],[String])
 compilerOpts argv =
     case getOpt Permute options argv of
-        (args,file,[]) ->
+        (args,files,[]) ->
             if | DL.elem Help args ->
                do SIO.hPutStrLn stderr (greeting ++ SCG.usageInfo header options)
                   SX.exitWith SX.ExitSuccess
-               | DL.elem Version args ->
-               do SIO.hPutStrLn stderr (greeting ++ version ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith SX.ExitSuccess
-               | DL.length (DL.filter (isStyleSheetChoice) args) < 1 ->
-               do SIO.hPutStrLn stderr (sscmiss ++ github ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | DL.length (DL.filter (isStyleSheetChoice) args) > 0 &&
-                 (not (checkStyleSheetChoice (extractStyleSheetChoice (DL.head (DL.filter (isStyleSheetChoice) args))))) ->
-               do SIO.hPutStrLn stderr (sscerror ++ github ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | DL.length file > 1 ->
-               do SIO.hPutStrLn stderr (flerror ++ github ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | DL.length (DL.filter (Main.isFilterFields) args) < 1 ->
-               do SIO.hPutStrLn stderr (ffmiss ++ github ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (Main.isFilterFields) args) > 0) && 
-                 (not (filterFieldsCheck (Main.extractFilterFields (DL.head (DL.filter (Main.isFilterFields) args))))) ->
-               do SIO.hPutStrLn stderr (fferror ++ github ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isOutputFileName) args) < 1) ->
-               do SIO.hPutStrLn stderr (outfilenamemiss ++ suffpossible ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isOutputFileName) args) > 0) &&
-                 (not (checkOutputFileName
-                 (extractOutputFileName (DL.head (DL.filter (isOutputFileName) 
-                 args))))) ->
-               do SIO.hPutStrLn stderr (sufferror ++ suffpossible ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isOutputSheetName) args) > 0) &&
-                 (not (checkOutputSheetName (extractOutputSheetName (DL.head (DL.filter (isOutputSheetName) args))))) ->
-               do SIO.hPutStrLn stderr (outsheeterror ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isBinaryPassingColor) args) > 0) &&
-                 (not (isHexList (extractBinaryPassingColor (DL.head (DL.filter (isBinaryPassingColor) args))))) ->
-               do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isBinaryFailingColor) args) > 0) &&
-                 (not (isHexList (extractBinaryFailingColor (DL.head (DL.filter (isBinaryFailingColor) args))))) ->
-               do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isTrinaryMiddleColor) args) > 0) &&
-                 (not (isHexList (extractTrinaryMiddleColor (DL.head (DL.filter (isTrinaryMiddleColor) args))))) ->
-               do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | (DL.length (DL.filter (isNAColor) args) > 0) &&
-                 (not (isHexList (extractNAColor (DL.head (DL.filter (isNAColor) args))))) -> 
-               do SIO.hPutStrLn stderr (hexferror ++ hexf ++ "\n" ++ SCG.usageInfo header options)
-                  SX.exitWith (SX.ExitFailure 1)
-               | otherwise -> return (DL.nub args, DL.concat file) 
+               | otherwise -> return (DL.nub args,files) 
         (_,_,errors) -> do
             SIO.hPutStrLn stderr (DL.concat errors ++ SCG.usageInfo header options)
             SX.exitWith (SX.ExitFailure 1)
         where 
             greeting         = "Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.\n"
-            header           = "Usage: Fat [-vV?osFSBcHpfhmln] [tsv]\n"
-            version          = "Filtering Analysis Tool (FAT), Version 1.0.\n"
-            github           = "Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n"
-            sscmiss          = "StyleSheet argument missing.\nPlease provide a StyleSheet:\ndefault\nvaccine\n"
-            sscerror         = "Please provide one of following StyleSheet choices:\ndefault\nvaccine\n" 
-            flerror          = "Incorrect number of input files:  Please provide one input file.\n"
-            fferror          = "Incorrect structure of the filtration string (;?:~~;).\n"
-            ffmiss           = "Filtration string missing.\nPlease define a \ 
-                               \filtration string using the -F (--filterfields) argument.\n"
-            outfilenamemiss  = "Output file name missing.\nPlease provide an output file name.\n" 
-            outsheeterror    = "Please provide xlsx accepted characters for sheet names (\\/*?:[].)\n\
-                               \less than 32 characters long to the -s (--outputsheetname) argument.\n"
-            hexferror        = "Incorrect hex format.\n"
-            hexf             = "ASCII hexadecimal digits: '0'..'9', 'a'..'f', 'A'..'F'.\n"
-            sufferror        = "File extension not allowed.\n"
-            suffpossible     = "Allowed file extensions are:\n.xlsx\n" 
+            header           = "Usage: FAT [-h] [Configuration YAML] [Tab-delimited (tsv) file]\n\
+                               \Filtering Analysis Tool (FAT), Version 1.0.\n\
+                               \Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.\n"
 
 {----------------------------------------}
 
 
-{-StyleSheetChoice function.-}
+{-Configuration YAML sanitization.-}
 
-checkStyleSheetChoice :: String -> Bool
-checkStyleSheetChoice [] = False
-checkStyleSheetChoice xs = if xs == "default" ||
-                              xs == "vaccine"
-                               then True
-                               else False
-
-{----------------------------}
-
-
-{-OutputFileName function.-}
+--checkStyleSheetChoice -> This function will
+--check the format of
+--the stylesheetchoice text.
+checkStyleSheetChoice :: FATConfig -> Bool
+checkStyleSheetChoice xs = if | (extractStyleSheetChoice xs) == "default" ||
+                                (extractStyleSheetChoice xs) == "vaccine"
+                              -> True
+                              | otherwise
+                              -> False
 
 --checkOutputFileName -> This function will
---check the format of 
---the OutputFileName string.
-checkOutputFileName :: String -> Bool
-checkOutputFileName [] = False
-checkOutputFileName xs = if (xs =~ ("\\.xlsx$" :: String) :: Bool)
-                                              then True
-                                              else False
+--check the format of
+--the outputfilename text.
+checkOutputFileName :: FATConfig -> Bool
+checkOutputFileName xs = if | ((extractOutputFileName xs) =~ ("\\.xlsx$" :: String) :: Bool)
+                            -> True
+                            | otherwise 
+                            -> False
 
-{---------------------------}
+--checkOutputSheetName -> This function will
+--check the format of
+--the outputsheetname text.
+checkOutputSheetName :: FATConfig -> Bool
+checkOutputSheetName xs = if | DL.length (extractOutputSheetName xs) <= 31 &&
+                               DL.all (\x -> x `DL.notElem` "\\/*?:[].") (extractOutputSheetName xs)
+                             -> True
+                             | otherwise
+                             -> False
 
-
-{-OutputSheetName function.-}
-
-checkOutputSheetName :: String -> Bool
-checkOutputSheetName [] = False
-checkOutputSheetName xs = if DL.length xs <= 31 &&
-                             DL.all (\x -> x `DL.notElem` "\\/*?:[].") xs
-                              then True
-                              else False
-
-{---------------------------}
-
-
-{-FilterFields Functions.-}
-
---ffgenerator -> This function will
---generate the list of acceptable
---numbers of filterfield delimiters.
-ffgenerator :: [Int] -> [Int]
-ffgenerator xs = xs ++ ffgenerator (DL.map (\n -> n + 5) xs)
-
---filterFieldsCheck -> This function will
---check for the appropriate number of 
---delimiters present in FilterFields.
-filterFieldsCheck :: String -> Bool
-filterFieldsCheck xs = if (DL.elem flaglength ffdelimiterlengths) && 
-                          ((DL.filter (flip DL.elem ("?;:~" :: String)) xs) == ffdelimitercycler)
-                           then True
-                           else False
+--checkCopyColumnFormatting -> This function will
+--check the key-value pairs for copycolumnformatting. 
+checkCopyColumnFormatting :: [(String,String)] -> [[String]] -> Bool
+checkCopyColumnFormatting xs ys = if | DL.all (\x -> x `DL.elem` columns) keycolumns &&
+                                       DL.all (\x -> x `DL.elem` columns) valuecolumns
+                                     -> True
+                                     | otherwise 
+                                     -> False
     where
-        flaglength         = DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs)
-        ffdelimiterlengths = DL.take (DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs))
-                           $ ffgenerator [6]
-        ffdelimitercycler = DL.concat (DL.take (DL.length (DL.filter (flip DL.elem ("?;:~" :: String)) xs)) 
-                            (DL.cycle [";","?",":","~","~"]))
- 
-{-------------------------}
+        --Local definitions.--
+        keycolumns    = DL.map (fst) xs
+        valuecolumns  = DL.map (snd) xs
+        columns       = DL.head ys 
+        ----------------------
+
+--processConfigurationYaml -> This function will
+--sanitize all possible fields in the Configuration YAML.
+processConfigurationYaml :: FATConfig -> [[String]] -> Bool
+processConfigurationYaml xs ys = if | checkStyleSheetChoice xs                                                            &&
+                                      checkOutputFileName xs                                                              &&
+                                      checkOutputSheetName xs                                                             &&
+                                      checkCopyColumnFormatting (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                                (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting xs)))) ys 
+                                    -> True
+                                    | otherwise 
+                                    -> False
+                                 
+
+{--------------------------------}
 
 
 {-Xlsx function and definitions.-}
@@ -402,17 +160,12 @@ filterFieldsCheck xs = if (DL.elem flaglength ffdelimiterlengths) &&
 --create a CellMap using input from 
 --[(String,Int,Int,String)] and
 --cartesian coordinates for data-occupying cells.
-createCellMap :: [(String,Int,Int,String)] -> [(Int,Int)] -> [Flag] -> [((Int,Int),Cell)]
-createCellMap []               []     []    = []
-createCellMap []               []     (_:_) = []
+createCellMap :: [(String,Int,Int,String)] -> [(Int,Int)] -> FATConfig -> [((Int,Int),Cell)]
+createCellMap []               []     _     = []
 createCellMap []               (_:_)  _     = []
 createCellMap ((_, _, _, _):_) []     _     = []
-createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
-                                                 let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                                                 --Extract the string from OutputFileName.
-                                                 let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
-                                                 --If user defined "default" for StyleSheetChoice.
-                                                 if | stylesheetchoicestring == "default" ->
+createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --If user defined "default" for StyleSheetChoice.
+                                                 if | (extractStyleSheetChoice opts) == "default" ->
                                                     --Header fields (":HEADER").
                                                     if | d == "HEADER" ->
                                                          ([(y,Cell { _cellStyle = Just 1
@@ -550,17 +303,11 @@ createCellMap ((a,_,_,d):xs)   (y:ys) opts  = do --Grab just "STYLESHEETCHOICE".
 --hideColumns -> This function will
 --hide column(s) from view within an
 --excel worksheet.
-hideColumns :: [[(String,Int,Int,String)]] -> [Flag] -> [ColumnsProperties]
-hideColumns [] []   = []
-hideColumns _  []   = []
+hideColumns :: [[(String,Int,Int,String)]] -> FATConfig -> [ColumnsProperties]
 hideColumns [] _    = []
 hideColumns xs opts = do
     --Grab just "HIDECOLUMNS".
-    let hidecolumns = DL.head (DL.filter (isHideColumns) opts)
-    --Extract the string from HideColumns.
-    let hidecolumnstring = extractHideColumns hidecolumns
-    --Prepare hidecolumnstring.
-    let finalhidecolumnstring = DLS.splitOn "," (DL.tail (DL.init hidecolumnstring))
+    let finalhidecolumnstring = DMaybe.fromJust (extractHideColumns opts)
     --Call smallHideColumns.
     setColumnsProperties xs finalhidecolumnstring
 
@@ -617,24 +364,19 @@ allColumns (x:xs) = (smallAllColumns x) ++ (allColumns xs)
 
 --createAndPrintXlsx -> This function will
 --create and print the xlsx file.
-createAndPrintXlsx :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
-createAndPrintXlsx [] []   = return ()
-createAndPrintXlsx [] _    = return ()
+createAndPrintXlsx :: FATConfig -> [[(String,Int,Int,String)]] -> IO ()
 createAndPrintXlsx _  []   = return ()
 createAndPrintXlsx opts xs = do
-    --Grab just "OUTFILENAME".
-    let outfilename = DL.head (DL.filter (isOutputFileName) opts)
     --Extract the string from OutputFileName.
-    let outfilenamestring = extractOutputFileName outfilename
+    let outfilenamestring = extractOutputFileName opts
     --Calculate xy-coordinates (1-based) for xs.
     let cartcoor = DI.range ((1,1),(DL.length xs,DL.length (DL.head xs)))
     --Create CellMap for fixedxs.
-    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts)
-    --Add finalcellmap to filledworksheet.
+    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts) 
     --Check for FullProtection flag.
-    if | DL.elem FullProtection opts -> 
+    if | DMaybe.fromJust (extractFullProtection opts) -> 
        do --Check for HideColumns flag..
-          if | DL.length (DL.filter (isHideColumns) opts) > 0 ->
+          if | isHideColumns opts ->
              do --Call hideColumms.
                 let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
                                                    , _wsRowPropertiesMap = defaultrowpropertiesmap
@@ -652,15 +394,11 @@ createAndPrintXlsx opts xs = do
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
                 --Check for OutputSheetName flag.
-                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-                   do --Grab just "OUTFILENAME".
-                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                if | isOutputSheetName opts ->
+                   do --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName opts
                       --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName outsheetname
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -689,10 +427,8 @@ createAndPrintXlsx opts xs = do
                    | otherwise ->
                    do --Set xlsxsheetname.
                       let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
                       --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -736,15 +472,11 @@ createAndPrintXlsx opts xs = do
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
                 --Check for OutputSheetName flag.
-                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-                   do --Grab just "OUTFILENAME".
-                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                if | isOutputSheetName opts ->
+                   do --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName opts
                       --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName outsheetname
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -773,10 +505,8 @@ createAndPrintXlsx opts xs = do
                     | otherwise ->
                     do --Set xlsxsheetname.
                       let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
                       --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -804,7 +534,7 @@ createAndPrintXlsx opts xs = do
                             DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
        | otherwise -> 
        do --Check for HideColumns flag..
-          if | DL.length (DL.filter (isHideColumns) opts) > 0 ->
+          if | isHideColumns opts ->
              do --Call hideColumns
                 let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
                                                    , _wsRowPropertiesMap = defaultrowpropertiesmap
@@ -822,15 +552,11 @@ createAndPrintXlsx opts xs = do
                                                    , _wsSharedFormulas = defaultwssharedformulas 
                                                    }
                 --Check for OutputSheetName flag.
-                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-                   do --Grab just "OUTFILENAME".
-                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                if | isOutputSheetName opts ->
+                   do --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName opts
                       --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName outsheetname
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -859,10 +585,8 @@ createAndPrintXlsx opts xs = do
                    | otherwise ->
                    do --Set xlsxsheetname.
                       let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
                       --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -906,15 +630,11 @@ createAndPrintXlsx opts xs = do
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
                 --Check for OutputSheetName flag.
-                if | DL.length (DL.filter (isOutputSheetName) opts) > 0 ->
-                   do --Grab just "OUTFILENAME".
-                      let outsheetname = DL.head (DL.filter (isOutputSheetName) opts)
+                if | isOutputSheetName opts ->
+                   do --Extract the string from OutputFileName.
+                      let outsheetnamestring = extractOutputSheetName opts
                       --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName outsheetname
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -943,10 +663,8 @@ createAndPrintXlsx opts xs = do
                     | otherwise ->
                     do --Set xlsxsheetname.
                       let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Grab just "STYLESHEETCHOICE".
-                      let stylesheetchoice = DL.head (DL.filter (isStyleSheetChoice) opts)
                       --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice stylesheetchoice
+                      let stylesheetchoicestring = extractStyleSheetChoice opts
                       --If stylesheetchoicestring == "default".
                       if | stylesheetchoicestring == "default" ->
                          do --Add filledworksheet to filledxlsx.
@@ -982,9 +700,7 @@ createAndPrintXlsx opts xs = do
 --print the file to either stdout
 --or to a output file based on
 --command-lines options provided.
-printFile :: [Flag] -> [[(String,Int,Int,String)]] -> IO ()
-printFile []   [] = return ()
-printFile []   _  = return ()
+printFile :: FATConfig -> [[(String,Int,Int,String)]] -> IO ()
 printFile _    [] = return ()
 printFile opts xs = --Create and print the xlsx file.
                     createAndPrintXlsx opts xs
@@ -997,31 +713,31 @@ printFile opts xs = --Create and print the xlsx file.
 --processArgsAndFiles -> This function will
 --walk through each of the command-line
 --arguments and files provided by the user.
-processArgsAndFiles :: ([Flag],String) -> IO ()
+processArgsAndFiles :: ([Flag],[String]) -> IO ()
 processArgsAndFiles ([],[]) = return () 
-processArgsAndFiles (options,inputfile) = do
+processArgsAndFiles (options,inputfiles) = do
     --Read in the file.
-    readinputfile <- SIO.readFile inputfile
+    readinputtsv <- SIO.readFile (inputfiles DL.!! 1)
     --Apply lineFeed function to inputfile.
-    let processedfile = lineFeed readinputfile 
-    --Filter the file based on the filter fields header. 
-    let filteredfile = filterFields options processedfile 
-    --Print the xlsx file.
-    printFile options filteredfile
-
---processArgsAndContents -> This function will
---walk through each of the command-line
---arguments and files provided by the user.
-processArgsAndContents :: ([Flag],String) -> IO ()
-processArgsAndContents ([],[]) = return ()
-processArgsAndContents (options,content) = do
-    --Apply lineFeed function to inputfile.
-    let processedfile = lineFeed content
-    --Filter the file based on the filter fields header.
-    let filteredfile = filterFields options processedfile
-    --Print the xlsx file.
-    printFile options filteredfile
-
+    let processedtsv = lineFeed readinputtsv
+    --Read in Configuration YAML.
+    readinputyaml <- DBC.readFile (inputfiles DL.!! 0)
+    --Decode readinputyaml.
+    decodedinputyaml <- 
+        case decodeEither' readinputyaml of
+            Left exc -> error $ "Could not parse Configuration YAML file: \n" ++ show exc
+            Right decodedinputyaml -> return decodedinputyaml 
+    --Process and ensure correctly formatting Configuration YAML input.
+    if | processConfigurationYaml decodedinputyaml processedtsv
+       -> do --Filter the file based on the filter fields header. 
+             let filteredfile = filterFields decodedinputyaml processedtsv
+             --Print the xlsx file.
+             printFile decodedinputyaml filteredfile
+       | otherwise 
+       -> do --Print out failure message.
+             print "Could not sanitize Configuation YAML.\n"
+             SX.exitWith (SX.ExitFailure 1)
+           
 {-------------------------}
 
 
@@ -1032,12 +748,14 @@ main = do
     --Get command line arguments.
     (args,files) <- SE.getArgs >>= compilerOpts
     --See if files is null
-    if DL.null files
-        then do --Get stdin.
-                contents <- SIO.getContents
-                --Run args and contents through processArgsandContents.
-                processArgsAndContents (args,contents)
-        else do --Run args and files through processArgsandFiles.
-                processArgsAndFiles (args,files)
+    if | (DL.length files) /= 2
+       -> do --Print error statement and exit.
+             print "FAT requires two arguments:\n\
+                   \Argument 1: Configuration YAML file\n\
+                   \Argument 2: Tab-delimited (tsv) file\n"
+             SX.exitWith (SX.ExitFailure 1)
+       | otherwise 
+       -> do --Run args and files through processArgsandFiles.
+             processArgsAndFiles (args,files)
     
 {----------------}

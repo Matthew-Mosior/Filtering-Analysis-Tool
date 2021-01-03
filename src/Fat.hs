@@ -141,12 +141,18 @@ checkCopyColumnFormatting xs ys = if | DL.all (\x -> x `DL.elem` columns) keycol
 --processConfigurationYaml -> This function will
 --sanitize all possible fields in the Configuration YAML.
 processConfigurationYaml :: FATConfig -> [[String]] -> Bool
-processConfigurationYaml xs ys = if | checkStyleSheetChoice xs                                                            &&
-                                      checkOutputFileName xs                                                              &&
-                                      checkOutputSheetName xs                                                             &&
-                                      checkCopyColumnFormatting (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
-                                                                (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting xs)))) ys 
-                                    -> True
+processConfigurationYaml xs ys = if | isCopyColumnFormatting xs -> 
+                                    if | checkStyleSheetChoice xs                                                            &&
+                                         checkOutputFileName xs                                                              &&
+                                         checkOutputSheetName xs                                                             &&
+                                         checkCopyColumnFormatting (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
+                                                                   (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting xs)))) ys
+                                       -> True
+                                    | not (isCopyColumnFormatting xs) ->
+                                    if | checkStyleSheetChoice xs                                                            &&
+                                         checkOutputFileName xs                                                              &&
+                                         checkOutputSheetName xs
+                                       -> True  
                                     | otherwise 
                                     -> False
                                  
@@ -374,7 +380,7 @@ createAndPrintXlsx opts xs = do
     --Create CellMap for fixedxs.
     let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts) 
     --Check for FullProtection flag.
-    if | DMaybe.fromJust (extractFullProtection opts) -> 
+    if | extractFullProtection opts -> 
        do --Check for HideColumns flag..
           if | isHideColumns opts ->
              do --Call hideColumms.

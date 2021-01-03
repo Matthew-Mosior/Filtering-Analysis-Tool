@@ -26,11 +26,13 @@ module YamlParser where
 
 {-Import modules.-}
 
+import Control.Applicative as CA
 import Control.Monad (mzero)
 import Data.List as DL
 import Data.Maybe as DMaybe
 import Data.Yaml as DYaml
 import Data.Aeson as DAeson
+import Data.HashMap.Lazy as DHL
 import YamlParse.Applicative as YPA
 import Data.Map.Strict as DMap
 import Data.Text as DText
@@ -68,7 +70,7 @@ data Filter = Filter { filteringtype       :: Text
 data FString = BFSNumericChoice BFSNumeric
              | BFSStringChoice BFSString
              | TFSNumericAndStringChoice TFSNumericAndString
-             deriving Generic
+             deriving (Eq,Ord,Show,Read)
 
 data BFSNumeric = BFSNumeric { bfsnumericoperator :: Text
                              , bfsnumericnumber   :: Text
@@ -84,51 +86,74 @@ data TFSNumericAndString = TFSNumericAndString { tfsnumericstringhead   :: [Text
                                                } deriving (Eq,Ord,Show,Read)
 
 instance FromJSON FATConfig where
-    parseJSON = withObject "configuration" $ \v -> FATConfig
-        <$> v .: "output_file_name"
-        <*> v .: "output_sheet_name"
-        <*> v .: "stylesheet_choice"
-        <*> v .: "full_protection"
-        <*> v .: "filters"
-        <*> v .: "add_filtering_status"
-        <*> v .: "add_filtering_binaries"
-        <*> v .: "copy_column_formatting"
-        <*> v .: "hide_columns"
-        <*> v .: "binary_passing_color"
-        <*> v .: "binary_failing_color"
-        <*> v .: "trinary_head_color"
-        <*> v .: "trinary_middle_color"
-        <*> v .: "trinary_tail_color"
-        <*> v .: "na_color" 
+    parseJSON (Object v) = parseFATConfig v
+    parseJSON _          = CA.empty
+    
+parseFATConfig v = FATConfig
+    <$> v .:  "output_file_name"
+    <*> v .:  "output_sheet_name"
+    <*> v .:  "stylesheet_choice"
+    <*> v .:  "full_protection"
+    <*> v .:  "filters"
+    <*> v .:  "add_filtering_status"
+    <*> v .:  "add_filtering_binaries"
+    <*> v .:? "copy_column_formatting"
+    <*> v .:? "hide_columns"
+    <*> v .:? "binary_passing_color"
+    <*> v .:? "binary_failing_color"
+    <*> v .:? "trinary_head_color"
+    <*> v .:? "trinary_middle_color"
+    <*> v .:? "trinary_tail_color"
+    <*> v .:? "na_color" 
 
 instance FromJSON Filter where
-    parseJSON = withObject "filter" $ \v -> Filter
-        <$> v .: "filtering_type"
-        <*> v .: "filtering_column"
-        <*> v .: "filtering_column_type"
-        <*> v .: "filtering_operator"
-        <*> v .: "filtering_string"
+    parseJSON (Object v) = parseFilter v
+    parseJSON _          = CA.empty
 
-instance FromJSON FString
+parseFilter v = Filter
+    <$> v .: "filtering_type"
+    <*> v .: "filtering_column"
+    <*> v .: "filtering_column_type"
+    <*> v .: "filtering_operator"
+    <*> v .: "filtering_string"
+
+instance FromJSON FString where
+    parseJSON (Object v)    = fstringValue
+        where hasBFSNumeric = DHL.member "bfs_numeric_number" v
+              hasBFSString  = DHL.member "bfs_string_literal" v
+              fstringValue  = parseFString hasBFSNumeric hasBFSString v
+    parseJSON _             = CA.empty
+
+parseFString hasBFSNumeric hasBFSString value
+    | hasBFSNumeric = BFSNumericChoice <$> parseBFSNumeric value
+    | hasBFSString  = BFSStringChoice  <$> parseBFSString value
+    | otherwise     = TFSNumericAndStringChoice <$> parseTFSNumericAndString value
 
 instance FromJSON BFSNumeric where
-    parseJSON = withObject "bfs_numeric" $ \v -> BFSNumeric
-        <$> v .: "bfs_numeric_operator"
-        <*> v .: "bfs_numeric_number"
+    parseJSON (Object v) = parseBFSNumeric v
+    parseJSON _          = CA.empty
+
+parseBFSNumeric v = BFSNumeric
+    <$> v .: "bfs_numeric_operator"
+    <*> v .: "bfs_numeric_number"
 
 instance FromJSON BFSString where
-    parseJSON = withObject "bfs_string" $ \v -> BFSString
-        <$> v .: "bfs_string_operator"
-        <*> v .: "bfs_string_literal"
+    parseJSON (Object v) = parseBFSString v
+    parseJSON _          = CA.empty
+
+parseBFSString v = BFSString
+    <$> v .: "bfs_string_operator"
+    <*> v .: "bfs_string_literal"
 
 instance FromJSON TFSNumericAndString where
-    parseJSON = withObject "tfs_numeric_and_string" $ \v -> TFSNumericAndString
-        <$> v .: "tfs_numeric_and_string_head"
-        <*> v .: "tfs_numeric_and_string_middle"
-        <*> v .: "tfs_numeric_and_string_tail"
+   parseJSON (Object v) = parseTFSNumericAndString v
+   parseJSON _          = CA.empty
 
-
-      
+parseTFSNumericAndString v = TFSNumericAndString
+    <$> v .: "tfs_numeric_and_string_head"
+    <*> v .: "tfs_numeric_and_string_middle"
+    <*> v .: "tfs_numeric_and_string_tail"
+  
 {--------------------------------------------------------}
 
 
@@ -280,9 +305,8 @@ extractStyleSheetChoice (FATConfig _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack
 --extractFullProtection -> This function will
 --extract the Boolean value associated with
 --fullprotection.
-extractFullProtection :: FATConfig -> Maybe Bool
-extractFullProtection (FATConfig _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = Just x
-extractFullProtection _                                         = Nothing
+extractFullProtection :: FATConfig -> Bool
+extractFullProtection (FATConfig _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
 
 --extractFiltering -> This function will
 --extract the string associated with
@@ -293,16 +317,14 @@ extractFiltering (FATConfig _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
 --extractAddFilteringStatus -> This function will
 --extract the boolean value associated with
 --addfilteringstatus.
-extractAddFilteringStatus :: FATConfig -> Maybe Bool
-extractAddFilteringStatus (FATConfig _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = Just x
-extractAddFilteringStatus _                                         = Nothing
+extractAddFilteringStatus :: FATConfig -> Bool
+extractAddFilteringStatus (FATConfig _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
 
 --extractAddFilteringBinaries -> This function will
 --extract the boolean value associated with
 --addfilteringbinaries.
-extractAddFilteringBinaries :: FATConfig -> Maybe Bool
-extractAddFilteringBinaries (FATConfig _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = Just x
-extractAddFilteringBinaries _                                         = Nothing
+extractAddFilteringBinaries :: FATConfig -> Bool
+extractAddFilteringBinaries (FATConfig _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
 
 --extractCopyColumnFormatting -> This function will
 --extract the string associated with

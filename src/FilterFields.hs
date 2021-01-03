@@ -66,14 +66,14 @@ filterFieldsDecide x (Node (FFRequirement p) subtree)
 
 --Define boolTrueAddFilteringStatus
 boolTrueAddFilteringStatus :: FATConfig -> Bool
-boolTrueAddFilteringStatus xs = if | DMaybe.fromJust (extractAddFilteringStatus xs)
+boolTrueAddFilteringStatus xs = if | extractAddFilteringStatus xs
                                    -> True
                                    | otherwise
                                    -> False
 
 --Define boolTrueAddFilteringBinaries
 boolTrueAddFilteringBinaries :: FATConfig -> Bool
-boolTrueAddFilteringBinaries xs = if | DMaybe.fromJust (extractAddFilteringBinaries xs)
+boolTrueAddFilteringBinaries xs = if | extractAddFilteringBinaries xs
                                      -> True
                                      | otherwise
                                      -> False

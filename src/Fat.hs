@@ -141,21 +141,24 @@ checkCopyColumnFormatting xs ys = if | DL.all (\x -> x `DL.elem` columns) keycol
 --processConfigurationYaml -> This function will
 --sanitize all possible fields in the Configuration YAML.
 processConfigurationYaml :: FATConfig -> [[String]] -> Bool
-processConfigurationYaml xs ys = if | isCopyColumnFormatting xs -> 
+processConfigurationYaml xs ys = if | not (DMaybe.isNothing (extractCopyColumnFormatting xs)) -> 
                                     if | checkStyleSheetChoice xs                                                            &&
                                          checkOutputFileName xs                                                              &&
                                          checkOutputSheetName xs                                                             &&
                                          checkCopyColumnFormatting (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
                                                                    (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting xs)))) ys
                                        -> True
-                                    | not (isCopyColumnFormatting xs) ->
+                                       | otherwise
+                                       -> False
+                                    | DMaybe.isNothing (extractCopyColumnFormatting xs) ->
                                     if | checkStyleSheetChoice xs                                                            &&
                                          checkOutputFileName xs                                                              &&
                                          checkOutputSheetName xs
-                                       -> True  
+                                       -> True
+                                        | otherwise
+                                        -> False  
                                     | otherwise 
                                     -> False
-                                 
 
 {--------------------------------}
 
@@ -313,7 +316,9 @@ hideColumns :: [[(String,Int,Int,String)]] -> FATConfig -> [ColumnsProperties]
 hideColumns [] _    = []
 hideColumns xs opts = do
     --Grab just "HIDECOLUMNS".
-    let finalhidecolumnstring = DMaybe.fromJust (extractHideColumns opts)
+    let finalhidecolumnstring = DL.map (DText.unpack) 
+                                       (DMaybe.fromJust 
+                                       (extractHideColumns opts))
     --Call smallHideColumns.
     setColumnsProperties xs finalhidecolumnstring
 
@@ -334,10 +339,12 @@ setColumnsProperties xs (y:ys) = (smallSetColumnsProperties xs y) ++ (setColumns
         smallSetColumnsProperties (x:xs) ys = (smallerSetColumnsProperties x ys) ++ (smallSetColumnsProperties xs ys)
         --smallerSetColumnsProperties
         smallerSetColumnsProperties :: [(String,Int,Int,String)] -> String -> [ColumnsProperties]
-        smallerSetColumnsProperties xs     ys = if | (quadrupletFst (xs DL.!! 0)) == ys ->
+        smallerSetColumnsProperties _      [] = []
+        smallerSetColumnsProperties []     _  = []
+        smallerSetColumnsProperties xs     ys = if | (quadrupletFst (DL.head xs)) == ys ->
                                                    [ ColumnsProperties
-                                                     { cpMin = (quadrupletThrd (xs DL.!! 0)) + 1
-                                                     , cpMax = (quadrupletThrd (xs DL.!! 0)) + 1
+                                                     { cpMin = (quadrupletThrd (DL.head xs)) + 1
+                                                     , cpMax = (quadrupletThrd (DL.head xs)) + 1
                                                      , cpWidth = Nothing
                                                      , cpStyle = Nothing
                                                      , cpHidden = True
@@ -359,8 +366,8 @@ allColumns (x:xs) = (smallAllColumns x) ++ (allColumns xs)
         smallAllColumns :: [(String,Int,Int,String)] -> [ColumnsProperties]
         smallAllColumns [] = []
         smallAllColumns xs = [ ColumnsProperties
-                             { cpMin = (quadrupletThrd (xs DL.!! 0)) + 1
-                             , cpMax = (quadrupletThrd (xs DL.!! 0)) + 1
+                             { cpMin = (quadrupletThrd (DL.head xs)) + 1
+                             , cpMax = (quadrupletThrd (DL.head xs)) + 1
                              , cpWidth = Just 14.0
                              , cpStyle = Nothing
                              , cpHidden = False
@@ -371,19 +378,19 @@ allColumns (x:xs) = (smallAllColumns x) ++ (allColumns xs)
 --createAndPrintXlsx -> This function will
 --create and print the xlsx file.
 createAndPrintXlsx :: FATConfig -> [[(String,Int,Int,String)]] -> IO ()
-createAndPrintXlsx _  []   = return ()
+createAndPrintXlsx _    [] = return ()
 createAndPrintXlsx opts xs = do
     --Extract the string from OutputFileName.
     let outfilenamestring = extractOutputFileName opts
     --Calculate xy-coordinates (1-based) for xs.
     let cartcoor = DI.range ((1,1),(DL.length xs,DL.length (DL.head xs)))
     --Create CellMap for fixedxs.
-    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts) 
-    --Check for FullProtection flag.
-    if | extractFullProtection opts -> 
-       do --Check for HideColumns flag..
-          if | isHideColumns opts ->
-             do --Call hideColumms.
+    let finalcellmap = DMap.fromList (createCellMap (DL.concat xs) cartcoor opts)
+    --Check for HideColumns flag.
+    if | (extractHideColumns opts) /= Nothing -> 
+       do --Check for fullprotection.
+          if | extractFullProtection opts ->
+             do --Use full protection for _wsProtection.
                 let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
                                                    , _wsRowPropertiesMap = defaultrowpropertiesmap
                                                    , _wsCells = finalcellmap
@@ -399,68 +406,86 @@ createAndPrintXlsx opts xs = do
                                                    , _wsProtection = fullwsprotection
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
-                --Check for OutputSheetName flag.
-                if | isOutputSheetName opts ->
-                   do --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName opts
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                --Extract the string from OutputFileName.
+                let outsheetnamestring = extractOutputSheetName opts
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice opts
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx 
+                      
                    | otherwise ->
-                   do --Set xlsxsheetname.
-                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx 
              | otherwise ->
+             do --Don't use full protection for _wsProtection.
+                let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
+                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
+                                                   , _wsCells = finalcellmap
+                                                   , _wsDrawing = defaultwsdrawing
+                                                   , _wsMerges = defaultwsmerges
+                                                   , _wsSheetViews = defaultwssheetviews
+                                                   , _wsPageSetup = defaultwspagesetup
+                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
+                                                   , _wsDataValidations = defaultwsdatavalidations
+                                                   , _wsPivotTables = defaultwspivottables
+                                                   , _wsAutoFilter = defaultwsautofilter
+                                                   , _wsTables = defaultwstables
+                                                   , _wsProtection = defaultwsprotection
+                                                   , _wsSharedFormulas = defaultwssharedformulas
+                                                   }
+                --Extract the string from OutputFileName.
+                let outsheetnamestring = extractOutputSheetName opts
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice opts
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+
+                   | otherwise ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+       | otherwise ->
+       do --Check for fullprotection.
+          if | extractFullProtection opts -> 
              do --Use defaultwsprotection as defined in FatDefinitions.hs.
                 let filledworksheet = CX.Worksheet { _wsColumnsProperties = allColumns (DL.transpose xs)
                                                    , _wsRowPropertiesMap = defaultrowpropertiesmap
@@ -477,149 +502,37 @@ createAndPrintXlsx opts xs = do
                                                    , _wsProtection = fullwsprotection
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
-                --Check for OutputSheetName flag.
-                if | isOutputSheetName opts ->
-                   do --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName opts
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                    | otherwise ->
-                    do --Set xlsxsheetname.
-                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-       | otherwise -> 
-       do --Check for HideColumns flag..
-          if | isHideColumns opts ->
-             do --Call hideColumns
-                let filledworksheet = CX.Worksheet { _wsColumnsProperties = hideColumns (DL.transpose xs) opts
-                                                   , _wsRowPropertiesMap = defaultrowpropertiesmap
-                                                   , _wsCells = finalcellmap
-                                                   , _wsDrawing = defaultwsdrawing
-                                                   , _wsMerges = defaultwsmerges
-                                                   , _wsSheetViews = defaultwssheetviews
-                                                   , _wsPageSetup = defaultwspagesetup
-                                                   , _wsConditionalFormattings = defaultwsconditionalformattings
-                                                   , _wsDataValidations = defaultwsdatavalidations
-                                                   , _wsPivotTables = defaultwspivottables
-                                                   , _wsAutoFilter = defaultwsautofilter
-                                                   , _wsTables = defaultwstables
-                                                   , _wsProtection = defaultwsprotection 
-                                                   , _wsSharedFormulas = defaultwssharedformulas 
-                                                   }
-                --Check for OutputSheetName flag.
-                if | isOutputSheetName opts ->
-                   do --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName opts
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise -> 
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                --Extract the string from OutputFileName.
+                let outsheetnamestring = extractOutputSheetName opts
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice opts
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
                    | otherwise ->
-                   do --Set xlsxsheetname.
-                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise -> 
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-             | otherwise -> 
-             do --Use defaultwsprotection as defined in FatDefinitions.hs.
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+             | otherwise ->
+             do --Don't use full protection for _wsProtection.
                 let filledworksheet = CX.Worksheet { _wsColumnsProperties = allColumns (DL.transpose xs)
                                                    , _wsRowPropertiesMap = defaultrowpropertiesmap
                                                    , _wsCells = finalcellmap
@@ -635,67 +548,35 @@ createAndPrintXlsx opts xs = do
                                                    , _wsProtection = defaultwsprotection
                                                    , _wsSharedFormulas = defaultwssharedformulas
                                                    }
-                --Check for OutputSheetName flag.
-                if | isOutputSheetName opts ->
-                   do --Extract the string from OutputFileName.
-                      let outsheetnamestring = extractOutputSheetName opts
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise -> 
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                    | otherwise ->
-                    do --Set xlsxsheetname.
-                      let xlsxsheetname = TR.subRegex (TR.mkRegex "\\.xlsx$") outfilenamestring ""
-                      --Extract the string from OutputFileName.
-                      let stylesheetchoicestring = extractStyleSheetChoice opts
-                      --If stylesheetchoicestring == "default".
-                      if | stylesheetchoicestring == "default" ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet defaultstylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
-                         | otherwise ->
-                         do --Add filledworksheet to filledxlsx.
-                            let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (xlsxsheetname),filledworksheet)]
-                                                     , _xlStyles = renderStyleSheet vaccinestylesheet
-                                                     , _xlDefinedNames = defaultxldefinednames
-                                                     , _xlCustomProperties = defaultxlcustomproperties
-                                                     , _xlDateBase = defaultxldatebase
-                                                     }
-                            --Grab time.
-                            currenttime <- DTCP.getPOSIXTime
-                            --Print out filledxlsx file.
-                            DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                --Extract the string from OutputFileName.
+                let outsheetnamestring = extractOutputSheetName opts
+                --Extract the string from OutputFileName.
+                let stylesheetchoicestring = extractStyleSheetChoice opts
+                --If stylesheetchoicestring == "default".
+                if | stylesheetchoicestring == "default" ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet defaultstylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx
+                   | otherwise ->
+                   do --Add filledworksheet to filledxlsx.
+                      let filledxlsx = CX.Xlsx { _xlSheets = [(DText.pack (outsheetnamestring),filledworksheet)]
+                                               , _xlStyles = renderStyleSheet vaccinestylesheet
+                                               , _xlDefinedNames = defaultxldefinednames
+                                               , _xlCustomProperties = defaultxlcustomproperties
+                                               , _xlDateBase = defaultxldatebase
+                                               }
+                      --Grab time.
+                      currenttime <- DTCP.getPOSIXTime
+                      --Print out filledxlsx file.
+                      DBL.writeFile outfilenamestring $ CX.fromXlsx currenttime filledxlsx       
 
 {-----------------}
 
@@ -708,8 +589,7 @@ createAndPrintXlsx opts xs = do
 --command-lines options provided.
 printFile :: FATConfig -> [[(String,Int,Int,String)]] -> IO ()
 printFile _    [] = return ()
-printFile opts xs = --Create and print the xlsx file.
-                    createAndPrintXlsx opts xs
+printFile opts xs = createAndPrintXlsx opts xs
 
 {---------------------}
 
@@ -726,24 +606,24 @@ processArgsAndFiles (options,inputfiles) = do
     readinputtsv <- SIO.readFile (inputfiles DL.!! 1)
     --Apply lineFeed function to inputfile.
     let processedtsv = lineFeed readinputtsv
-    --Read in Configuration YAML.
-    readinputyaml <- DBC.readFile (inputfiles DL.!! 0)
+    --Read in configuration YAML.
+    readinputyaml <- DBC.readFile (inputfiles DL.!! 0) 
     --Decode readinputyaml.
     decodedinputyaml <- 
         case decodeEither' readinputyaml of
-            Left exc -> error $ "Could not parse Configuration YAML file: \n" ++ show exc
-            Right decodedinputyaml -> return decodedinputyaml 
+            Left exc -> error $ "Could not parse configuration YAML file: \n" ++ show exc
+            Right decodedinputyaml -> return decodedinputyaml
     --Process and ensure correctly formatting Configuration YAML input.
     if | processConfigurationYaml decodedinputyaml processedtsv
-       -> do --Filter the file based on the filter fields header. 
+       -> do --Call filterFields function to filter processedtsv.
              let filteredfile = filterFields decodedinputyaml processedtsv
              --Print the xlsx file.
              printFile decodedinputyaml filteredfile
        | otherwise 
        -> do --Print out failure message.
-             print "Could not sanitize Configuation YAML.\n"
+             SIO.putStrLn "Could not sanitize Configuation YAML."
              SX.exitWith (SX.ExitFailure 1)
-           
+     
 {-------------------------}
 
 
@@ -756,12 +636,12 @@ main = do
     --See if files is null
     if | (DL.length files) /= 2
        -> do --Print error statement and exit.
-             print "FAT requires two arguments:\n\
-                   \Argument 1: Configuration YAML file\n\
-                   \Argument 2: Tab-delimited (tsv) file\n"
+             SIO.putStrLn "FAT requires two arguments:\n\
+                          \Argument 1: Configuration YAML file\n\
+                          \Argument 2: Tab-delimited (tsv) file\n"
              SX.exitWith (SX.ExitFailure 1)
        | otherwise 
        -> do --Run args and files through processArgsandFiles.
              processArgsAndFiles (args,files)
-    
+             
 {----------------}

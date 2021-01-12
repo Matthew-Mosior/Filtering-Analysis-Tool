@@ -97,28 +97,32 @@ isAlphaListFilteringColumnType xs = if | isAlphaList (extractFilteringColumnType
 
 --Define elemPlusFilteringOperator
 elemPlusFilteringOperator :: Filter -> Bool
-elemPlusFilteringOperator xs = if | DL.elem '+' (extractFilteringOperator xs) 
+--elemPlusFilteringOperator xs = if | DL.elem '+' (extractFilteringOperator xs) 
+elemPlusFilteringOperator xs = if | (extractFilteringOperator xs) == "+"
                                   -> True
                                   | otherwise 
                                   -> False
 
 --Define elemMinusFilteringOperator
 elemMinusFilteringOperator :: Filter -> Bool
-elemMinusFilteringOperator xs = if | DL.elem '-' (extractFilteringOperator xs)
+--elemMinusFilteringOperator xs = if | DL.elem '-' (extractFilteringOperator xs)
+elemMinusFilteringOperator xs = if | (extractFilteringOperator xs) == "-"
                                    -> True
                                    | otherwise
                                    -> False
 
 --Define elemDivisionSignFilteringOperator
 elemDivisionSignFilteringOperator :: Filter -> Bool
-elemDivisionSignFilteringOperator xs = if | DL.elem '/' (extractFilteringOperator xs)
+--elemDivisionSignFilteringOperator xs = if | DL.elem '/' (extractFilteringOperator xs)
+elemDivisionSignFilteringOperator xs = if | (extractFilteringOperator xs) == "/"
                                           -> True
                                           | otherwise
                                           -> False
 
 --Define elemPipeFilteringOperator
 elemPipeFilteringOperator :: Filter -> Bool
-elemPipeFilteringOperator xs = if | DL.elem '|' (extractFilteringOperator xs)
+--elemPipeFilteringOperator xs = if | DL.elem '|' (extractFilteringOperator xs)
+elemPipeFilteringOperator xs = if | (extractFilteringOperator xs) == "|"
                                   -> True
                                   | otherwise
                                   -> False
@@ -749,7 +753,7 @@ specificFilters xs ys = do
                                             iffsf (isInfixOfLessThanFilteringString) [
                                                 addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                            ((DL.map (\allys@(y,_,_) -> 
-                                                                if | not (y =~ "NA" :: Bool) ||
+                                                                if | not (y =~ "NA" :: Bool) &&
                                                                      not (y =~ "N/A" :: Bool)
                                                                    -> if | (((read :: String -> Double) y) >=
                                                                            ((read :: String -> Double) 
@@ -763,7 +767,7 @@ specificFilters xs ys = do
                                             iffsf (isInfixOfGreaterThanFilteringString) [
                                                 addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                             ((DL.map (\allys@(y,_,_) -> 
-                                                                 if | not (y =~ "NA" :: Bool) ||
+                                                                 if | not (y =~ "NA" :: Bool) &&
                                                                       not (y =~ "N/A" :: Bool)
                                                                     -> if | (((read :: String -> Double) y) <=
                                                                             ((read :: String -> Double) 

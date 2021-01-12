@@ -58,14 +58,14 @@ data FATConfig = FATConfig { outputfilename       :: Text
                            , trinarymiddlecolor   :: Maybe Text
                            , trinarytailcolor     :: Maybe Text
                            , nacolor              :: Maybe Text
-                           } 
+                           } deriving (Eq,Show,Read)
 
 data Filter = Filter { filteringtype       :: Text
                      , filteringcolumn     :: Text
                      , filteringcolumntype :: Text
                      , filteringoperator   :: Text
                      , filteringstring     :: FString
-                     } 
+                     } deriving (Eq,Ord,Show,Read) 
 
 data FString = BFSNumericChoice BFSNumeric
              | BFSStringChoice BFSString
@@ -157,131 +157,6 @@ parseTFSNumericAndString v = TFSNumericAndString
 {--------------------------------------------------------}
 
 
-{-Custom bool functions for FATConfig Datatype.-}
-
---isOutputFileName -> This function will
---test for outputfilename value constructor for FATConfig.
-isOutputFileName :: FATConfig -> Bool
-isOutputFileName (FATConfig outputfilename _ _ _ _ _ _ _ _ _ _ _ _ _ _) = True
-isOutputFileName _                                                      = False
-
---isOutputSheetName -> This function will
---test for outputsheetname value constructor for FATConfig.
-isOutputSheetName :: FATConfig -> Bool
-isOutputSheetName (FATConfig _ outputsheetname _ _ _ _ _ _ _ _ _ _ _ _ _) = True
-isOutputSheetName _                                                       = False
-
---isStyleSheetChoice -> This function will
---test for outputsheetname value constructor for FATConfig.
-isStyleSheetChoice :: FATConfig -> Bool
-isStyleSheetChoice (FATConfig _ _ stylesheetchoice _ _ _ _ _ _ _ _ _ _ _ _) = True
-isStyleSheetChoice _                                                        = False
-
---isFullProtection -> This function will
---test for the fullprotection value constructor for FATConfig.
-isFullProtection :: FATConfig -> Bool
-isFullProtection (FATConfig _ _ _ fullprotection _ _ _ _ _ _ _ _ _ _ _) = True
-isFullProtection _                                                      = False
-
---isFilterFields -> This function will
---test for filtering value constructor for FATConfig.
-isFiltering :: FATConfig -> Bool
-isFiltering (FATConfig _ _ _ _ filtering _ _ _ _ _ _ _ _ _ _) = True
-isFiltering _                                                 = False
-
---isAddFilteringStatus -> This function will
---test for addfilteringstatus value constructor for FATConfig.
-isAddFilteringStatus :: FATConfig -> Bool
-isAddFilteringStatus (FATConfig _ _ _ _ _ addfilteringstatus _ _ _ _ _ _ _ _ _) = True
-isAddFilteringStatus _                                                          = False
-
---isAddFilteringBinaries -> This function will
---test for addfilteringstatus value constructor for FATConfig.
-isAddFilteringBinaries :: FATConfig -> Bool
-isAddFilteringBinaries (FATConfig _ _ _ _ _ _ addfilteringbinaries _ _ _ _ _ _ _ _) = True
-isAddFilteringBinaries _                                                            = False
-
---isCopyColumnFormatting -> This function will
---test for copycolumnformatting value constructor for FATConfig.
-isCopyColumnFormatting :: FATConfig -> Bool
-isCopyColumnFormatting (FATConfig _ _ _ _ _ _ _ copycolumnformatting _ _ _ _ _ _ _) = True
-isCopyColumnFormatting _                                                            = False
-
---isHideColumns -> This function will
---test for hidecolumn value constructor for FATConfig.
-isHideColumns :: FATConfig -> Bool
-isHideColumns (FATConfig _ _ _ _ _ _ _ _ hidecolumns _ _ _ _ _ _) = True
-isHideColumns _                                                   = False
-
---isBinaryPassingColor -> This function will
---test for the binarypassingcolor value constructor for FATConfig.
-isBinaryPassingColor :: FATConfig -> Bool
-isBinaryPassingColor (FATConfig _ _ _ _ _ _ _ _ _ binarypassingcolor _ _ _ _ _) = True
-isBinaryPassingColor _                                                          = False
-
---isBinaryFailingColor -> This function will
---test for the binaryfailingcolor value constructor for FATConfig.
-isBinaryFailingColor :: FATConfig -> Bool
-isBinaryFailingColor (FATConfig _ _ _ _ _ _ _ _ _ _ binaryfailingcolor _ _ _ _) = True
-isBinaryFailingColor _                                                          = False
-
---isTrinaryHeadColor -> This function will
---test for the trinaryheadcolor value constructor for FATConfig.
-isTrinaryHeadColor :: FATConfig -> Bool
-isTrinaryHeadColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ trinaryheadcolor _ _ _) = True
-isTrinaryHeadColor _                                                        = False
-
---isTrinaryMiddleColor -> This function will
---test for the trinarymiddlecolor value constructor for FATConfig.
-isTrinaryMiddleColor :: FATConfig -> Bool
-isTrinaryMiddleColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ trinarymiddlecolor _ _) = True
-isTrinaryMiddleColor _                                                          = False
-
---isTrinaryTailColor -> This function will
---test for the trinarytailcolor value constructor for FATConfig.
-isTrinaryTailColor :: FATConfig -> Bool
-isTrinaryTailColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ trinarytailcolor _) = True
-isTrinaryTailColor _                                                        = False
-
---isNAColor -> This function will
---test for the nacolor value constructor for FATConfig.
-isNAColor :: FATConfig -> Bool
-isNAColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ _ nacolor) = True
-isNAColor _                                               = False
-
---isFilteringType -> This function will
---test for the filteringtype value constructor for Filter.
-isFilteringType :: Filter -> Bool
-isFilteringType (Filter filteringtype _ _ _ _) = True
-isFilteringType _                              = False
-
---isFilteringColumn -> This function will
---test for the filteringcolumn value constructor for Filter.
-isFilteringColumn :: Filter -> Bool
-isFilteringColumn (Filter _ filteringcolumn _ _ _) = True
-isFilteringColumn _                                = False
-
---isFilteringColumnType -> This function will
---test for the filteringcolumntype value constructor for Filter.
-isFilteringColumnType :: Filter -> Bool
-isFilteringColumnType (Filter _ _ filteringcolumntype _ _) = True
-isFilteringColumnType _                                    = False
-
---isFilteringOperator -> This function will
---test for the filteringoperator value constructor for Filter.
-isFilteringOperator :: Filter -> Bool
-isFilteringOperator (Filter _ _ _ filteringoperator _) = True
-isFilteringOperator _                                  = False
-
---isFilteringString -> This function will
---test for the filteringstring value constructor for Filter.
-isFilteringString :: Filter -> Bool
-isFilteringString (Filter _ _ _ _ filteringstring) = True
-isFilteringString _                                = False 
-
-{------------------------------------------}
-
-
 {-Custom extraction functions for FATConfig Datatype.-}
 
 --extractOutputFileName -> This function will
@@ -336,8 +211,9 @@ extractCopyColumnFormatting _                                         = Nothing
 --extractHideColumns -> This function will
 --extract the string associated with
 --hidecolumns.
-extractHideColumns :: FATConfig -> Maybe [String]
-extractHideColumns (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = Just (DL.map (DText.unpack) (DMaybe.fromJust x))
+extractHideColumns :: FATConfig -> Maybe [Text]
+--extractHideColumns (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = Just (DL.map (DText.unpack) (DMaybe.fromJust x))
+extractHideColumns (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
 extractHideColumns _                                         = Nothing
 
 --extractBinaryPassingColor -> This function will
@@ -411,35 +287,49 @@ extractFilteringString (Filter _ _ _ _ x) = x
 --extract the data type associated with bfsnumericoperator.
 extractBFSNumericOperator :: FString -> String
 extractBFSNumericOperator (BFSNumericChoice (BFSNumeric x _)) = DText.unpack x
+extractBFSNumericOperator (BFSStringChoice _)                 = []
+extractBFSNumericOperator (TFSNumericAndStringChoice _)       = []  
 
 --extractBFSNumericNumber -> This function will
 --extract the data type associated with bfsnumericnumber.
 extractBFSNumericNumber :: FString -> String
 extractBFSNumericNumber (BFSNumericChoice (BFSNumeric _ x)) = DText.unpack x
+extractBFSNumericNumber (BFSStringChoice _)                 = []
+extractBFSNumericNumber (TFSNumericAndStringChoice _)       = []
 
 --extractBFSStringOperator -> This function will
 --extract the data type associated with bfsstringoperator.
 extractBFSStringOperator :: FString -> String
 extractBFSStringOperator (BFSStringChoice (BFSString x _)) = DText.unpack x
+extractBFSStringOperator (BFSNumericChoice _)              = []
+extractBFSStringOperator (TFSNumericAndStringChoice _)     = []
 
 --extractBFSStringLiteral -> This function will
 --extract the data type associated with bfsstringliteral.
 extractBFSStringLiteral :: FString -> [String]
 extractBFSStringLiteral (BFSStringChoice (BFSString _ x)) = DL.map (\y -> DText.unpack y) x
+extractBFSStringLiteral (BFSNumericChoice _)              = []
+extractBFSStringLiteral (TFSNumericAndStringChoice _)     = []
 
 --extractTFSNumericAndStringHead -> This function will
 --extract the data type associated with tfsnumericstringhead.
 extractTFSNumericAndStringHead :: FString -> [String]
 extractTFSNumericAndStringHead (TFSNumericAndStringChoice (TFSNumericAndString x _ _)) = DL.map (\y -> DText.unpack y) x
+extractTFSNumericAndStringHead (BFSNumericChoice _) = []
+extractTFSNumericAndStringHead (BFSStringChoice _)  = []
 
 --extractTFSNumericAndStringMiddle -> This function will
 --extract the data type associated with tfsnumericstringmiddle.
 extractTFSNumericAndStringMiddle :: FString -> [String]
 extractTFSNumericAndStringMiddle (TFSNumericAndStringChoice (TFSNumericAndString _ x _)) = DL.map (\y -> DText.unpack y) x
+extractTFSNumericAndStringMiddle (BFSNumericChoice _) = []
+extractTFSNumericAndStringMiddle (BFSStringChoice _) = []
 
 --extractTFSNumericAndStringTail -> This function will
 --extract the data type associated with tfsnumericstringtail.
 extractTFSNumericAndStringTail :: FString -> [String]
 extractTFSNumericAndStringTail (TFSNumericAndStringChoice (TFSNumericAndString _ _ x)) = DL.map (\y -> DText.unpack y) x
+extractTFSNumericAndStringTail (BFSNumericChoice _) = []
+extractTFSNumericAndStringTail (BFSStringChoice _) = []
 
 {------------------------------------------------}

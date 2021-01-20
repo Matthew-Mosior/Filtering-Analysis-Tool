@@ -182,7 +182,7 @@ defaultstylesheet = StyleSheet
             , _cellXfApplyBorder = Nothing
             , _cellXfApplyFill = Nothing
             , _cellXfApplyFont = Nothing
-            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyNumberFormat = Just True
             , _cellXfApplyProtection = Nothing
             , _cellXfBorderId = Just 0
             , _cellXfFillId = Just 0
@@ -199,7 +199,7 @@ defaultstylesheet = StyleSheet
             , _cellXfApplyBorder = Nothing
             , _cellXfApplyFill = Nothing
             , _cellXfApplyFont = Nothing
-            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyNumberFormat = Just True
             , _cellXfApplyProtection = Nothing
             , _cellXfBorderId = Just 0
             , _cellXfFillId = Just 0
@@ -582,8 +582,107 @@ defaultstylesheet = StyleSheet
             , _fontVertAlign = Nothing
             }
         ]
-    , _styleSheetDxfs = []
-    , _styleSheetNumFmts = DMap.fromList []
+    , _styleSheetDxfs = [ Dxf 
+                            { _dxfFont = Nothing 
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing 
+                            , _dxfAlignment = Nothing 
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        ]
+    , _styleSheetNumFmts = DMap.fromList [ (0,DText.pack "")
+                                         , (0,DText.pack "")
+                                         , (1,DText.pack "")
+                                         , (2,DText.pack "") 
+                                         , (3,DText.pack "")
+                                         , (4,DText.pack "")
+                                         , (5,DText.pack "")
+                                         , (6,DText.pack "")
+                                         ]
     }
 
 --Defines the vaccine trials StyleSheet.
@@ -727,12 +826,12 @@ vaccinestylesheet = StyleSheet
             , _cellXfApplyBorder = Just True
             , _cellXfApplyFill = Nothing
             , _cellXfApplyFont = Nothing
-            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyNumberFormat = Just True
             , _cellXfApplyProtection = Nothing
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 0
             , _cellXfFontId = Just 0
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -744,12 +843,12 @@ vaccinestylesheet = StyleSheet
             , _cellXfApplyBorder = Just True
             , _cellXfApplyFill = Nothing
             , _cellXfApplyFont = Nothing
-            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyNumberFormat = Just True
             , _cellXfApplyProtection = Nothing
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 0
             , _cellXfFontId = Just 0
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -778,7 +877,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 0
             , _cellXfFontId = Just 0
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -807,7 +906,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 0
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -836,7 +935,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 2
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0 
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -865,7 +964,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 3
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -889,12 +988,12 @@ vaccinestylesheet = StyleSheet
             , _cellXfApplyBorder = Just True
             , _cellXfApplyFill = Just True
             , _cellXfApplyFont = Nothing
-            , _cellXfApplyNumberFormat = Nothing
+            , _cellXfApplyNumberFormat = Just True
             , _cellXfApplyProtection = Nothing
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 4
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -923,7 +1022,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 5
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -952,7 +1051,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 6
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -981,7 +1080,7 @@ vaccinestylesheet = StyleSheet
             , _cellXfBorderId = Just 1
             , _cellXfFillId = Just 7
             , _cellXfFontId = Just 1
-            , _cellXfNumFmtId = Nothing
+            , _cellXfNumFmtId = Just 0
             , _cellXfPivotButton = Nothing
             , _cellXfQuotePrefix = Nothing
             , _cellXfId = Just 0
@@ -1209,8 +1308,148 @@ vaccinestylesheet = StyleSheet
             , _fontVertAlign = Nothing
             }
         ]
-    , _styleSheetDxfs = []
-    , _styleSheetNumFmts = DMap.fromList []
+    , _styleSheetDxfs = [ Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just 
+                                ( NumFmt 
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack "" 
+                                    } 
+                                ) 
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }
+                        , Dxf
+                            { _dxfFont = Nothing
+                            , _dxfNumFmt = Just
+                                ( NumFmt
+                                    { _numFmtId = 0
+                                    , _numFmtCode = DText.pack ""
+                                    }
+                                )
+                            , _dxfFill = Nothing
+                            , _dxfAlignment = Nothing
+                            , _dxfBorder = Nothing
+                            , _dxfProtection = Nothing
+                            }      
+                        ]
+    , _styleSheetNumFmts = DMap.fromList [ (0,DText.pack "")
+                                         , (1,DText.pack "")
+                                         , (2,DText.pack "")
+                                         , (3,DText.pack "")
+                                         , (4,DText.pack "")
+                                         , (5,DText.pack "")
+                                         , (6,DText.pack "")
+                                         , (7,DText.pack "")
+                                         , (8,DText.pack "")
+                                         , (9,DText.pack "")
+                                         ]
     }
 
 --Defines default _xlDefinedNames data type value.

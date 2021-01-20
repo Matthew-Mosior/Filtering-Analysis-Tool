@@ -30,6 +30,7 @@ import Data.Char as DC
 import Data.List as DL
 import Data.List.Split as DLS
 import Data.Maybe as DMaybe
+import Data.Set as DS
 import Data.Tree as DT
 
 {---------}
@@ -49,6 +50,16 @@ data Flag
 --isSubsetOf -> This function will
 --be used in the stripHeader function.
 xs `isSubsetOf` ys = DL.any (`DL.elem` ys) xs
+
+--isTrueSubsetOf -> This function will
+--test to see if one list is a subset
+--of another list.
+isTrueSubsetOf  :: Ord a => [a] -> [a] -> Bool
+isTrueSubsetOf xs ys = all (`DS.member` yset) xs 
+    where
+        --Local definition.--
+        yset = DS.fromList ys
+        ---------------------
 
 --lineFeed -> This function will
 --read the file in and split on

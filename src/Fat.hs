@@ -94,6 +94,17 @@ compilerOpts argv =
 
 {-Configuration YAML sanitization.-}
 
+--checkFilteringColumnVsHeaders -> This function will
+--check to ensure that the filtering columns
+--listed in the configuration yaml
+--exist in the input tsv.
+checkFilteringColumnVsHeaders :: FATConfig -> [String] -> Bool
+checkFilteringColumnVsHeaders _ []  = False
+checkFilteringColumnVsHeaders xs ys = if | isTrueSubsetOf (DL.map (extractFilteringColumn) (extractFiltering xs)) ys
+                                         -> True
+                                         | otherwise
+                                         -> False
+
 --checkStyleSheetChoice -> This function will
 --check the format of
 --the stylesheetchoice text.
@@ -142,7 +153,8 @@ checkCopyColumnFormatting xs ys = if | DL.all (\x -> x `DL.elem` columns) keycol
 --sanitize all possible fields in the Configuration YAML.
 processConfigurationYaml :: FATConfig -> [[String]] -> Bool
 processConfigurationYaml xs ys = if | not (DMaybe.isNothing (extractCopyColumnFormatting xs)) -> 
-                                    if | checkStyleSheetChoice xs                                                            &&
+                                    if | checkFilteringColumnVsHeaders xs (DL.head ys)                                       &&
+                                         checkStyleSheetChoice xs                                                            &&
                                          checkOutputFileName xs                                                              &&
                                          checkOutputSheetName xs                                                             &&
                                          checkCopyColumnFormatting (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
@@ -151,7 +163,8 @@ processConfigurationYaml xs ys = if | not (DMaybe.isNothing (extractCopyColumnFo
                                        | otherwise
                                        -> False
                                     | DMaybe.isNothing (extractCopyColumnFormatting xs) ->
-                                    if | checkStyleSheetChoice xs                                                            &&
+                                    if | checkFilteringColumnVsHeaders xs (DL.head ys)                                       &&
+                                         checkStyleSheetChoice xs                                                            &&
                                          checkOutputFileName xs                                                              &&
                                          checkOutputSheetName xs
                                        -> True

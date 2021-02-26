@@ -50,6 +50,7 @@ data FATConfig = FATConfig { outputfilename       :: Text
                            , filtering            :: [Filter]
                            , addfilteringstatus   :: Bool
                            , addfilteringbinaries :: Bool
+                           , ignorebinaryfs       :: Maybe [Text]
                            , copycolumnformatting :: Maybe Object
                            , hidecolumns          :: Maybe [Text]
                            , binarypassingcolor   :: Maybe Text
@@ -97,6 +98,7 @@ parseFATConfig v = FATConfig
     <*> v .:  "filters"
     <*> v .:  "add_filtering_status"
     <*> v .:  "add_filtering_binaries"
+    <*> v .:? "ignore_binary_filtering_status"
     <*> v .:? "copy_column_formatting"
     <*> v .:? "hide_columns"
     <*> v .:? "binary_passing_color"
@@ -163,100 +165,97 @@ parseTFSNumericAndString v = TFSNumericAndString
 --extract the string associated with
 --outputfilename.
 extractOutputFileName :: FATConfig -> String
-extractOutputFileName (FATConfig x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
+extractOutputFileName (FATConfig x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
 
 --extractOutputSheetName -> This function will
 --extract the string associated with
 --outputsheetname.
 extractOutputSheetName :: FATConfig -> String
-extractOutputSheetName (FATConfig _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
+extractOutputSheetName (FATConfig _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
 
 --extractStyleSheetChoice -> This function will
 --extract the string associated with
 --stylesheetchoice.
 extractStyleSheetChoice :: FATConfig -> String
-extractStyleSheetChoice (FATConfig _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
+extractStyleSheetChoice (FATConfig _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = DText.unpack x
 
 --extractFullProtection -> This function will
 --extract the Boolean value associated with
 --fullprotection.
 extractFullProtection :: FATConfig -> Bool
-extractFullProtection (FATConfig _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
+extractFullProtection (FATConfig _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
 
 --extractFiltering -> This function will
 --extract the string associated with
 --filtering.
 extractFiltering :: FATConfig -> [Filter]
-extractFiltering (FATConfig _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
+extractFiltering (FATConfig _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
 
 --extractAddFilteringStatus -> This function will
 --extract the boolean value associated with
 --addfilteringstatus.
 extractAddFilteringStatus :: FATConfig -> Bool
-extractAddFilteringStatus (FATConfig _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
+extractAddFilteringStatus (FATConfig _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
 
 --extractAddFilteringBinaries -> This function will
 --extract the boolean value associated with
 --addfilteringbinaries.
 extractAddFilteringBinaries :: FATConfig -> Bool
-extractAddFilteringBinaries (FATConfig _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
+extractAddFilteringBinaries (FATConfig _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
+
+--extractIgnoreBinaryFS -> This function will
+--extract the boolean value associated with
+--ignorebinaryfs.
+extractIgnoreBinaryFS :: FATConfig -> Maybe [Text]
+extractIgnoreBinaryFS (FATConfig _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
 
 --extractCopyColumnFormatting -> This function will
 --extract the string associated with
 --copycolumnformatting.
 extractCopyColumnFormatting :: FATConfig -> Maybe Object
-extractCopyColumnFormatting (FATConfig _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
-extractCopyColumnFormatting _                                         = Nothing
+extractCopyColumnFormatting (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
 
 --extractHideColumns -> This function will
 --extract the string associated with
 --hidecolumns.
 extractHideColumns :: FATConfig -> Maybe [Text]
---extractHideColumns (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = Just (DL.map (DText.unpack) (DMaybe.fromJust x))
-extractHideColumns (FATConfig _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
-extractHideColumns _                                         = Nothing
+extractHideColumns (FATConfig _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
 
 --extractBinaryPassingColor -> This function will
 --extract the string associated with
 --binarypassingcolor.
 extractBinaryPassingColor :: FATConfig -> Maybe String
-extractBinaryPassingColor (FATConfig _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
-extractBinaryPassingColor _                                         = Nothing
+extractBinaryPassingColor (FATConfig _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractBinaryFailingColor -> This function will
 --extract the string associated with
 --binaryfailingcolor.
 extractBinaryFailingColor :: FATConfig -> Maybe String
-extractBinaryFailingColor (FATConfig _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
-extractBinaryFailingColor _                                         = Nothing
+extractBinaryFailingColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractTrinaryHeadColor -> This function will
 --extract the string associated with
 --trinaryheadcolor.
 extractTrinaryHeadColor :: FATConfig -> Maybe String
-extractTrinaryHeadColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
-extractTrinaryHeadColor _                                         = Nothing
+extractTrinaryHeadColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractTrinaryMiddleColor -> This function will
 --extract the string associated with
 --trinarymiddlecolor.
 extractTrinaryMiddleColor :: FATConfig -> Maybe String
-extractTrinaryMiddleColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = Just (DText.unpack (DMaybe.fromJust x))
-extractTrinaryMiddleColor _                                         = Nothing
+extractTrinaryMiddleColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractTrinaryTailColor -> This function will
 --extract the string associated with
 --trinarytailcolor.
 extractTrinaryTailColor :: FATConfig -> Maybe String
-extractTrinaryTailColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = Just (DText.unpack (DMaybe.fromJust x))
-extractTrinaryTailColor _                                         = Nothing
+extractTrinaryTailColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractNAColor -> This function will
 --extract the string associated with
 --nacolor.
 extractNAColor :: FATConfig -> Maybe String
-extractNAColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = Just (DText.unpack (DMaybe.fromJust x))
-extractNAColor _                                         = Nothing
+extractNAColor (FATConfig _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = Just (DText.unpack (DMaybe.fromJust x))
 
 --extractFilteringType -> This function will
 --extract the string associated with filteringtype.

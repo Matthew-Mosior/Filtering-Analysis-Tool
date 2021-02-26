@@ -11,6 +11,7 @@
 {-Lanuguage Extension.-}
 
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {----------------------}
 
@@ -50,6 +51,10 @@ data Flag
 --isSubsetOf -> This function will
 --be used in the stripHeader function.
 xs `isSubsetOf` ys = DL.any (`DL.elem` ys) xs
+
+--isNotSubsetOf -> This function will
+--be used in the stripHeader function.
+xs `isNotSubsetOf` ys = DL.any (`DL.notElem` ys) xs
 
 --isTrueSubsetOf -> This function will
 --test to see if one list is a subset

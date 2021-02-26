@@ -97,7 +97,6 @@ isAlphaListFilteringColumnType xs = if | isAlphaList (extractFilteringColumnType
 
 --Define elemPlusFilteringOperator
 elemPlusFilteringOperator :: Filter -> Bool
---elemPlusFilteringOperator xs = if | DL.elem '+' (extractFilteringOperator xs) 
 elemPlusFilteringOperator xs = if | (extractFilteringOperator xs) == "+"
                                   -> True
                                   | otherwise 
@@ -105,7 +104,6 @@ elemPlusFilteringOperator xs = if | (extractFilteringOperator xs) == "+"
 
 --Define elemMinusFilteringOperator
 elemMinusFilteringOperator :: Filter -> Bool
---elemMinusFilteringOperator xs = if | DL.elem '-' (extractFilteringOperator xs)
 elemMinusFilteringOperator xs = if | (extractFilteringOperator xs) == "-"
                                    -> True
                                    | otherwise
@@ -113,7 +111,6 @@ elemMinusFilteringOperator xs = if | (extractFilteringOperator xs) == "-"
 
 --Define elemDivisionSignFilteringOperator
 elemDivisionSignFilteringOperator :: Filter -> Bool
---elemDivisionSignFilteringOperator xs = if | DL.elem '/' (extractFilteringOperator xs)
 elemDivisionSignFilteringOperator xs = if | (extractFilteringOperator xs) == "/"
                                           -> True
                                           | otherwise
@@ -121,7 +118,6 @@ elemDivisionSignFilteringOperator xs = if | (extractFilteringOperator xs) == "/"
 
 --Define elemPipeFilteringOperator
 elemPipeFilteringOperator :: Filter -> Bool
---elemPipeFilteringOperator xs = if | DL.elem '|' (extractFilteringOperator xs)
 elemPipeFilteringOperator xs = if | (extractFilteringOperator xs) == "|"
                                   -> True
                                   | otherwise
@@ -144,6 +140,20 @@ isInfixOfGreaterThanFilteringString xs = if | (extractBFSNumericOperator (extrac
 --Define isInfixOfEqualSignFilteringString
 isInfixOfEqualSignFilteringString :: Filter -> Bool
 isInfixOfEqualSignFilteringString xs = if | (extractBFSStringOperator (extractFilteringString xs)) == "=="
+                                          -> True
+                                          | otherwise
+                                          -> False
+
+--Define isInfixOfNotEqualSignFilteringString
+isInfixOfNotEqualSignFilteringString :: Filter -> Bool
+isInfixOfNotEqualSignFilteringString xs = if | (extractBFSStringOperator (extractFilteringString xs)) == "/="
+                                             -> True
+                                             | otherwise
+                                             -> False
+
+--Define isInfixOfRegexSignFilteringString
+isInfixOfRegexSignFilteringString :: Filter -> Bool
+isInfixOfRegexSignFilteringString xs = if | (extractBFSStringOperator (extractFilteringString xs)) == "=~"
                                           -> True
                                           | otherwise
                                           -> False
@@ -293,9 +303,72 @@ equalityListCheckBinary xs (y:ys) = [smallEqualityListCheckBinary xs y] ++ (equa
         smallPredicateBinary :: [String] -> [String] -> Bool
         smallPredicateBinary [] _  = False
         smallPredicateBinary _  [] = False
-        smallPredicateBinary xs ys = if ys `isSubsetOf` xs
-                                         then True
-                                         else False
+        smallPredicateBinary xs ys = if | ys `isSubsetOf` xs
+                                        -> True
+                                        | otherwise
+                                        -> False
+
+        --------------------------------
+
+--notEqualityListCheckBinary -> This function will
+--serve to grab all elements for /= filter.
+notEqualityListCheckBinary :: [String] -> [(String,Int,Int)] -> [[(String,Int,Int,String)]]
+notEqualityListCheckBinary _ []  = []
+notEqualityListCheckBinary [] _  = []
+notEqualityListCheckBinary xs (y:ys) = [smallNotEqualityListCheckBinary xs y] ++ (notEqualityListCheckBinary xs ys)
+    where
+        --Nested function definitions.--
+        --smallNotEqualityListCheckBinary
+        smallNotEqualityListCheckBinary :: [String] -> (String,Int,Int) -> [(String,Int,Int,String)]
+        smallNotEqualityListCheckBinary [] (_,_,_)  = []
+        smallNotEqualityListCheckBinary _  ([],_,_) = []
+        smallNotEqualityListCheckBinary xs y        = if | (tripletFst y) /= "NA" ||
+                                                           (tripletFst y) /= "N/A"
+                                                         -> if | smallNotPredicateBinary xs [tripletFst y]
+                                                               -> [quadrupletTransform (y,"BINARYYES")]
+                                                               | otherwise
+                                                               -> [quadrupletTransform (y,"BINARYNO")]
+                                                         | otherwise
+                                                         -> [quadrupletTransform (y,"NA")]
+        --smallNotPredicateBinary
+        smallNotPredicateBinary :: [String] -> [String] -> Bool
+        smallNotPredicateBinary [] _  = False
+        smallNotPredicateBinary _  [] = False
+        smallNotPredicateBinary xs ys = if | ys `isNotSubsetOf` xs
+                                           -> True
+                                           | otherwise
+                                           -> False
+
+        --------------------------------
+
+--regexListCheckBinary -> This function will
+--serve to grab all elements for =~ filter.
+regexListCheckBinary :: [String] -> [(String,Int,Int)] -> [[(String,Int,Int,String)]]
+regexListCheckBinary _ []  = []
+regexListCheckBinary [] _  = []
+regexListCheckBinary xs (y:ys) = [smallRegexListCheckBinary xs y] ++ (regexListCheckBinary xs ys)
+    where
+        --Nested function definitions.--
+        --smallRegexListCheckBinary
+        smallRegexListCheckBinary :: [String] -> (String,Int,Int) -> [(String,Int,Int,String)]
+        smallRegexListCheckBinary [] (_,_,_)  = []
+        smallRegexListCheckBinary _  ([],_,_) = []
+        smallRegexListCheckBinary xs y        = if | (tripletFst y) /= "NA" ||
+                                                     (tripletFst y) /= "N/A"
+                                                   -> if | smallRegexPredicateBinary xs (tripletFst y)
+                                                         -> [quadrupletTransform (y,"BINARYYES")]
+                                                         | otherwise
+                                                         -> [quadrupletTransform (y,"BINARYNO")]
+                                                   | otherwise
+                                                   -> [quadrupletTransform (y,"NA")]
+        --smallRegexPredicateBinary
+        smallRegexPredicateBinary :: [String] -> String -> Bool
+        smallRegexPredicateBinary [] _  = False
+        smallRegexPredicateBinary _  [] = False
+        smallRegexPredicateBinary xs ys = if | DL.any (==True) (DL.map (\x -> (ys TRP.=~ x) :: Bool) xs)
+                                             -> True
+                                             | otherwise
+                                             -> False
 
         --------------------------------
 
@@ -782,6 +855,18 @@ specificFilters xs ys = do
                                                 addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
                                                            (DL.concat 
                                                            (equalityListCheckBinary 
+                                                           (extractBFSStringLiteral (extractFilteringString ffields)) onlydata)))])
+                                            ],
+                                            iffsf (isInfixOfNotEqualSignFilteringString) [
+                                                addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+                                                           (DL.concat
+                                                           (notEqualityListCheckBinary
+                                                           (extractBFSStringLiteral (extractFilteringString ffields)) onlydata)))])
+                                            ],
+                                            iffsf (isInfixOfRegexSignFilteringString) [
+                                                addilist ([((DL.map (\x -> quadrupletTransform (x,"HEADER")) notdata) ++
+                                                           (DL.concat
+                                                           (regexListCheckBinary
                                                            (extractBFSStringLiteral (extractFilteringString ffields)) onlydata)))])
                                             ]
                                         ]

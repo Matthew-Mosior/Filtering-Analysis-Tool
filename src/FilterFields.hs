@@ -162,10 +162,8 @@ addFilteringBinaryColumns xs     ys    zs     = ys ++ (smallAddFilteringBinaryCo
         smallAddFilteringBinaryColumns []     []    (_:_)  = []
         smallAddFilteringBinaryColumns []     (_:_) _      = []
         smallAddFilteringBinaryColumns (_:_)  _     []     = []
-        --smallAddFilteringBinaryColumns (x:xs) ys    (z:zs) = ys ++ ([smallerAddFilteringBinaryColumns x ys z]
-        --                                                   ++  (addFilteringBinaryColumns xs ys zs))
         smallAddFilteringBinaryColumns (x:xs) ys    (z:zs) = [smallerAddFilteringBinaryColumns x ys z] ++  (smallAddFilteringBinaryColumns xs ys zs)
-        --smallestAddFilteringBinaryColumns
+        --smallerAddFilteringBinaryColumns
         smallerAddFilteringBinaryColumns :: String -> [[(String,Int,Int,String)]] -> Int -> [(String,Int,Int,String)]
         smallerAddFilteringBinaryColumns [] [] _  = []
         smallerAddFilteringBinaryColumns _  [] _  = []
@@ -180,14 +178,14 @@ addFilteringBinaryColumns xs     ys    zs     = ys ++ (smallAddFilteringBinaryCo
         compareAddFilteringBinaryColumns []             _  = []
         compareAddFilteringBinaryColumns ((a,b,_,d):xs) ys = if | (d == "NA") ->
                                                                    [("1",b,ys,"FILTERCOLUMN")] ++ (compareAddFilteringBinaryColumns xs ys)
-                                                                 | (d == "BINARYYES") ->
-                                                                   [("1",b,ys,"FILTERCOLUMN")] ++ (compareAddFilteringBinaryColumns xs ys)
-                                                                 | (d == "BINARYNO") ->
-                                                                   [("0",b,ys,"FILTERCOLUMN")] ++ (compareAddFilteringBinaryColumns xs ys)
-                                                                 | (d == "HEADER") ->
-                                                                   [(a ++ "_BINARY",b,ys,"HEADER")]
-                                                                 ++ (compareAddFilteringBinaryColumns xs ys)
-                                                                 | otherwise -> compareAddFilteringBinaryColumns xs ys
+                                                                | (d == "BINARYYES") ->
+                                                                  [("1",b,ys,"FILTERCOLUMN")] ++ (compareAddFilteringBinaryColumns xs ys)
+                                                                | (d == "BINARYNO") ->
+                                                                  [("0",b,ys,"FILTERCOLUMN")] ++ (compareAddFilteringBinaryColumns xs ys)
+                                                                | (d == "HEADER") ->
+                                                                  [(a ++ "_BINARY",b,ys,"HEADER")]
+                                                                ++ (compareAddFilteringBinaryColumns xs ys)
+                                                                | otherwise -> compareAddFilteringBinaryColumns xs ys
         --------------------------------
 
 --copyColumnFormatting -> This function will
@@ -241,26 +239,58 @@ copyColumnFormatting xs    ys zs    = reorderFormatting
 
 --addPassOrFail -> This function will
 --add pass or fail remarks to each line.
-addPassOrFail :: [[(String,Int,Int,String)]] -> [[(String,Int,Int,String)]]
-addPassOrFail []     = []
-addPassOrFail (x:xs) = if | (DL.any (\(_,_,_,d) -> d == "BINARYNO") x)
-                          -> [x ++ [("Fail"
-                                    ,quadrupletSnd (DL.last x)
-                                    ,(quadrupletThrd (DL.last x)) + 1
-                                    ,"BINARYNO")]] ++ (addPassOrFail xs)
-                          | (DL.all (\(_,_,_,d) -> (d == "NA")            ||
-                                                   (d == "TRINARYHEAD")   ||
-                                                   (d == "TRINARYMIDDLE") ||
-                                                   (d == "TRINARYTAIL")) x)
-                          -> [x ++ [("Not_filtered"
-                                    ,quadrupletSnd (DL.last x)
-                                    ,(quadrupletThrd (DL.last x)) + 1
-                                    ,"NA")]] ++ (addPassOrFail xs)
-                          | otherwise 
-                          -> [x ++ [("Pass"
-                                    ,quadrupletSnd (DL.last x)
-                                    ,(quadrupletThrd (DL.last x)) + 1
-                                    ,"BINARYYES")]] ++ (addPassOrFail xs)  
+addPassOrFail :: [[(String,Int,Int,String)]] -> [(String,Int,Int,String)] -> FATConfig -> [[(String,Int,Int,String)]]
+addPassOrFail []     []     _    = []
+addPassOrFail []     (_:_)  _    = []
+addPassOrFail (x:xs) header opts = 
+   if | (extractIgnoreBinaryFS opts) /= Nothing -> 
+        if | DL.any (\(_,_,_,d) -> d == "BINARYNO") finalcolumns
+           -> [x ++ [("Fail"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                     ,"BINARYNO")]] ++ (addPassOrFail xs header opts)
+           | DL.all (\(_,_,_,d) -> (d == "NA")        ||
+                                   (d == "TRINARYHEAD")    ||
+                                   (d == "TRINARYMIDDLE")  ||
+                                   (d == "TRINARYTAIL")) finalcolumns
+           -> [x ++ [("Not_filtered"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                     ,"NA")]] ++ (addPassOrFail xs header opts)
+           | otherwise 
+           -> [x ++ [("Pass"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                    ,"BINARYYES")]] ++ (addPassOrFail xs header opts)
+      | otherwise -> 
+        if | DL.any (\(_,_,_,d) -> d == "BINARYNO") x
+           -> [x ++ [("Fail"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                     ,"BINARYNO")]] ++ (addPassOrFail xs header opts)
+           | DL.all (\(_,_,_,d) -> (d == "NA")            ||
+                                   (d == "TRINARYHEAD")   ||
+                                   (d == "TRINARYMIDDLE") ||
+                                   (d == "TRINARYTAIL")) x
+           -> [x ++ [("Not_filtered"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                     ,"NA")]] ++ (addPassOrFail xs header opts)
+           | otherwise
+           -> [x ++ [("Pass"
+                     ,quadrupletSnd (DL.last x)
+                     ,(quadrupletThrd (DL.last x)) + 1
+                     ,"BINARYYES")]] ++ (addPassOrFail xs header opts) 
+                                  
+       where
+           --Local definitions.--
+           ignorebinarycolumns = DL.map (DText.unpack)
+                                        (DMaybe.fromJust
+                                        (extractIgnoreBinaryFS opts))
+           filteredcolumnindices = DL.map (fst) (DL.filter (\(_,(a,_,_,_)) -> a `DL.notElem` ignorebinarycolumns) 
+                                                           (DL.zip [0..((DL.length header) - 1)] header))
+           finalcolumns = DL.map (x DL.!!) filteredcolumnindices
+           ----------------------
 
 --addFilteringStatusColumnHeader -> This function will
 --add the Filtering_Status to the first sublist.
@@ -303,13 +333,13 @@ filterFields opts xs = do
                                            (extractAllBinaryFilteringType opts)
                                            (DL.transpose (addFilteringStatusColumnHeader
                                                          ([DL.head transposedreorderedlist]
-                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts))))
                                            ([((DL.length (DL.head (addFilteringStatusColumnHeader
                                                          ([DL.head transposedreorderedlist]
-                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist)))))))
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts))))))
                                            ..((DL.length (DL.head (addFilteringStatusColumnHeader
                                                          ([DL.head transposedreorderedlist]
-                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist))))))
+                                                      ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts)))))
                                                        + (DL.length (extractAllBinaryFilteringType opts)) - 1)]))
                                            (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
                                                    (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
@@ -321,18 +351,18 @@ filterFields opts xs = do
                                      (extractAllBinaryFilteringType opts)
                                      (DL.transpose (addFilteringStatusColumnHeader
                                                    ([DL.head transposedreorderedlist]
-                                                ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                                ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts))))
                                      ([(DL.length (DL.head (addFilteringStatusColumnHeader
                                                    ([DL.head transposedreorderedlist]
-                                                ++ (addPassOrFail (DL.tail transposedreorderedlist))))))
+                                                ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts)))))
                                      ..((DL.length (DL.head (addFilteringStatusColumnHeader
                                                    ([DL.head transposedreorderedlist]
-                                                ++ (addPassOrFail (DL.tail transposedreorderedlist))))))
+                                                ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts)))))
                                                  + (DL.length (extractAllBinaryFilteringType opts)) - 1)])))
                         ],
                         addflist ((addFilteringStatusColumnHeader
                                   ([DL.head transposedreorderedlist]
-                               ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                               ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts))))
                     ],
                     iffff (boolTrueAddFilteringBinaries) [
                         iffff (boolIsCopyColumnFormatting) [
@@ -362,7 +392,7 @@ filterFields opts xs = do
                                        (DL.transpose
                                        (addFilteringStatusColumnHeader
                                        ([DL.head transposedreorderedlist]
-                                    ++ (addPassOrFail (DL.tail transposedreorderedlist)))))
+                                    ++ (addPassOrFail (DL.tail transposedreorderedlist) (DL.head transposedreorderedlist) opts))))
                                        (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 
                                                (DHS.toList (DMaybe.fromJust (extractCopyColumnFormatting opts))))
                                        (DL.map (snd) (DL.map (\(x,y) -> (DText.unpack x,DText.unpack x)) 

@@ -54,10 +54,10 @@ To install the peripheral packages **FAT** requires, you can call the following 
 
 **FAT** requires two inputs:<br/><br/>
 
-1. **Configuration YAML** - The first positional argument to **FAT** is the configuration YAML.  This YAML defines the filtering that will be applied to the user-defined tab-delimited file.<br/><br/>
+  1. **Configuration YAML** - The first positional argument to **FAT** is the configuration YAML.  This YAML defines the filtering that will be applied to the user-defined tab-delimited file.<br/><br/>
 
-**FAT** uses a DSL to allow for filtering in an modular and extensive fashion.<br/><br/>
+     **FAT** uses a DSL to allow for filtering in an modular and extensive fashion.<br/><br/>
 
-Please see the [wiki](https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki) for a full guide on how to set up complex filtering schemes using the configuration YAML.
+     Please see the [wiki](https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki) for a full guide on how to set up complex filtering schemes using the configuration YAML.
 
-2. **Tab-delimited (tsv) file** - The second positional argument to **FAT** is the tab-delimited (tsv) file.  The filtering scheme defined in the configuration YAML will be applied to this tab-delimited file to create the output XLSX file.
+  2. **Tab-delimited (tsv) file** - The second positional argument to **FAT** is the tab-delimited (tsv) file.  The filtering scheme defined in the configuration YAML will be applied to this tab-delimited file to create the output XLSX file.

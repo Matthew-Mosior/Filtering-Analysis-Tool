@@ -61,3 +61,33 @@ To install the peripheral packages **FAT** requires, you can call the following 
      Please see the [wiki](https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki) for a full guide on how to set up complex filtering schemes using the configuration YAML.
 
   2. **Tab-delimited (tsv) file** - The second positional argument to **FAT** is the tab-delimited (tsv) file.  The filtering scheme defined in the configuration YAML will be applied to this tab-delimited file to create the output XLSX file.
+
+## Usage
+
+**FAT** is easy to use.<br/><br/>
+You can call it using the **runghc** command provided by the GHC compiler as such:<br/>
+`$ runghc fat.hs config.yaml input.tsv`<br/><br/>
+For maximum performance, please compile and run the source code as follows:<br/>
+`$ ghc -O2 -o FAT fat.hs`<br/>
+`$ ./FAT config.yaml input.tsv`<br/><br/>
+
+## Arguments
+
+**FAT** is a simple, easy to use program:<br/>
+```
+Filtering Analysis Tool, Copyright (c) 2020 Matthew Mosior.
+Usage: FAT [-h] [Configuration YAML] [Tab-delimited (tsv) file]
+Filtering Analysis Tool (FAT), Version 1.0.
+Please see https://github.com/Matthew-Mosior/Filtering-Analysis-Tool/wiki for more information.
+
+  -h  --help  Print this help message.
+```
+
+## Docker
+
+A docker container exists that contains all the necessary software to run **FAT**: `matthewmosior/filteringanalysistool:final`<br/><br/>
+
+## Credits
+
+Documentation was added March 2021.<br/>
+Author : [Matthew Mosior](https://github.com/Matthew-Mosior)
